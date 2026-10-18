@@ -9,6 +9,11 @@ export const WINDOW_LABELS: Record<WindowKind, string> = {
   rolling_7d: "Semanal (7 dias)",
 };
 
+export const WINDOW_SHORT_LABELS: Record<WindowKind, string> = {
+  rolling_5h: "5h",
+  rolling_7d: "7d",
+};
+
 export const RULE_TYPE_LABELS: Record<RuleType, string> = {
   threshold: "Limiar de uso",
   interval: "Resumo periódico",

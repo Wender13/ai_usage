@@ -25,8 +25,6 @@ const typeOptions = Object.keys(RULE_TYPE_LABELS) as RuleType[];
 const providerOptions = Object.keys(PROVIDER_LABELS) as ProviderId[];
 const windowOptions = Object.keys(WINDOW_LABELS) as WindowKind[];
 const channelOptions = Object.keys(CHANNEL_LABELS) as Channel[];
-// The overlay channels are enabled once the overlay window exists.
-const availableChannels: Channel[] = ["notification"];
 
 const kind = props.rule?.kind;
 const form = reactive({
@@ -120,12 +118,7 @@ function onSubmit() {
     <label class="field">
       <span>Canal</span>
       <select v-model="form.channel">
-        <option
-          v-for="channel in channelOptions"
-          :key="channel"
-          :value="channel"
-          :disabled="!availableChannels.includes(channel)"
-        >
+        <option v-for="channel in channelOptions" :key="channel" :value="channel">
           {{ CHANNEL_LABELS[channel] }}
         </option>
       </select>

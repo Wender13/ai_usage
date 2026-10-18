@@ -2,13 +2,15 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use crate::domain::UsageSnapshot;
 use crate::poller::PollerHandle;
-use crate::rules::RuleBook;
+use crate::rules::{Alert, RuleBook};
 use crate::settings::Settings;
 
 pub struct AppState {
     snapshot: Mutex<UsageSnapshot>,
     settings: Mutex<Settings>,
     rules: Mutex<RuleBook>,
+    /// Alerts waiting to be dismissed in the overlay, oldest first.
+    overlay_alerts: Mutex<Vec<Alert>>,
     pub poller: PollerHandle,
 }
 
@@ -23,6 +25,7 @@ impl AppState {
             snapshot: Mutex::new(snapshot),
             settings: Mutex::new(settings),
             rules: Mutex::new(rules),
+            overlay_alerts: Mutex::new(Vec::new()),
             poller,
         }
     }
@@ -37,6 +40,10 @@ impl AppState {
 
     pub fn rules(&self) -> MutexGuard<'_, RuleBook> {
         lock(&self.rules)
+    }
+
+    pub fn overlay_alerts(&self) -> MutexGuard<'_, Vec<Alert>> {
+        lock(&self.overlay_alerts)
     }
 }
 

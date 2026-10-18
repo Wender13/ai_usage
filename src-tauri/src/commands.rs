@@ -1,11 +1,11 @@
-use tauri::{AppHandle, Runtime, State};
+use tauri::{AppHandle, Emitter, Runtime, State};
 use uuid::Uuid;
 
 use crate::domain::UsageSnapshot;
-use crate::rules::{Rule, RuleInput};
-use crate::settings::Settings;
+use crate::rules::{Alert, Rule, RuleInput};
+use crate::settings::{SETTINGS_CHANGED, Settings};
 use crate::state::AppState;
-use crate::store;
+use crate::{overlay, store};
 
 const RULE_NOT_FOUND: &str = "Regra não encontrada.";
 
@@ -24,18 +24,41 @@ pub fn get_settings(state: State<'_, AppState>) -> Settings {
     state.settings().clone()
 }
 
+/// Overlay visibility is ignored here; it only changes through `set_overlay_visible`,
+/// so a window holding stale settings cannot revert a toggle made from the tray.
 #[tauri::command]
 pub fn update_settings<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
     settings: Settings,
 ) -> Result<Settings, String> {
-    settings.validate()?;
-    store::save_settings(&app, &settings)?;
-    *state.settings() = settings.clone();
+    let mut next = state.settings().clone();
+    next.poll_interval_minutes = settings.poll_interval_minutes;
+    next.validate()?;
+    store::save_settings(&app, &next)?;
+    *state.settings() = next.clone();
+    let _ = app.emit(SETTINGS_CHANGED, &next);
     // Restarts the wait so the new interval applies now (this also polls once).
     state.poller.refresh_now();
-    Ok(settings)
+    Ok(next)
+}
+
+#[tauri::command]
+pub fn set_overlay_visible<R: Runtime>(
+    app: AppHandle<R>,
+    visible: bool,
+) -> Result<Settings, String> {
+    overlay::set_enabled(&app, visible)
+}
+
+#[tauri::command]
+pub fn get_overlay_alerts<R: Runtime>(app: AppHandle<R>) -> Vec<Alert> {
+    overlay::alerts(&app)
+}
+
+#[tauri::command]
+pub fn dismiss_overlay_alert<R: Runtime>(app: AppHandle<R>) {
+    overlay::dismiss_alert(&app);
 }
 
 #[tauri::command]

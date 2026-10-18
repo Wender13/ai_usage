@@ -2,46 +2,72 @@
 import { ref, watch } from "vue";
 import { useSettings } from "../composables/useSettings";
 
-const { settings, error, save } = useSettings();
+const { settings, error, save, setOverlay } = useSettings();
 const pollInterval = ref(3);
 const saved = ref(false);
 
-watch(settings, (value) => {
-  if (value) pollInterval.value = value.pollIntervalMinutes;
-});
+// Only follows the stored interval, so an unrelated change does not reset what is being typed.
+watch(
+  () => settings.value?.pollIntervalMinutes,
+  (value) => {
+    if (value !== undefined) pollInterval.value = value;
+  },
+);
 
 async function onSubmit() {
   if (!settings.value) return;
   saved.value = await save({ ...settings.value, pollIntervalMinutes: pollInterval.value });
 }
+
+function onOverlayChange(event: Event) {
+  void setOverlay((event.target as HTMLInputElement).checked);
+}
 </script>
 
 <template>
-  <form class="settings" @submit.prevent="onSubmit">
-    <label class="row">
-      <span>Consultar o uso a cada</span>
-      <input
-        v-model.number="pollInterval"
-        type="number"
-        min="1"
-        step="1"
-        required
-        @input="saved = false"
-      />
-      <span>min</span>
-    </label>
-    <button type="submit" :disabled="!settings">Salvar</button>
-    <span v-if="saved" class="ok">Salvo.</span>
-  </form>
+  <div class="panel">
+    <form class="row" @submit.prevent="onSubmit">
+      <label class="row">
+        <span>Consultar o uso a cada</span>
+        <input
+          v-model.number="pollInterval"
+          class="minutes"
+          type="number"
+          min="1"
+          step="1"
+          required
+          @input="saved = false"
+        />
+        <span>min</span>
+      </label>
+      <button type="submit" :disabled="!settings">Salvar</button>
+      <span v-if="saved" class="muted">Salvo.</span>
+    </form>
+
+    <div>
+      <label class="row">
+        <input
+          type="checkbox"
+          :checked="settings?.overlayEnabled ?? false"
+          :disabled="!settings"
+          @change="onOverlayChange"
+        />
+        <span>Mostrar overlay</span>
+      </label>
+      <p class="muted hint">
+        No GNOME em Wayland o overlay não fica sempre no topo; o README explica como rodar via
+        XWayland.
+      </p>
+    </div>
+  </div>
   <p v-if="error" class="error">{{ error }}</p>
 </template>
 
 <style scoped>
-.settings {
+.panel {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 14px;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -50,16 +76,22 @@ async function onSubmit() {
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 8px 12px;
 }
 
-.row input {
+.minutes {
   width: 72px;
 }
 
-.ok {
+.muted {
   color: var(--muted);
   font-size: 0.875rem;
+}
+
+.hint {
+  margin: 4px 0 0 28px;
+  font-size: 0.8125rem;
 }
 </style>

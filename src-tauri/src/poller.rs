@@ -85,5 +85,5 @@ async fn poll_once<R: Runtime>(app: &AppHandle<R>, providers: &[Arc<dyn UsagePro
     {
         eprintln!("{error}");
     }
-    alerts::dispatch(app, &alerts);
+    alerts::dispatch(app, alerts);
 }

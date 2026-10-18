@@ -17,6 +17,10 @@ impl Channel {
     pub fn notifies(self) -> bool {
         matches!(self, Self::Notification | Self::Both)
     }
+
+    pub fn shows_overlay(self) -> bool {
+        matches!(self, Self::Overlay | Self::Both)
+    }
 }
 
 /// In `provider` and `window`, `None` means "any".

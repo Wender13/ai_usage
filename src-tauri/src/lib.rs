@@ -2,6 +2,7 @@ mod alerts;
 mod commands;
 mod domain;
 mod error;
+mod overlay;
 mod poller;
 mod providers;
 mod rules;
@@ -65,6 +66,8 @@ pub fn run() {
 
             #[cfg(desktop)]
             {
+                overlay::create(app.handle())?;
+                overlay::sync_visibility(app.handle());
                 tray::create(app.handle())?;
 
                 if !std::env::args().any(|arg| arg == HIDDEN_FLAG) {
@@ -89,6 +92,9 @@ pub fn run() {
             commands::create_rule,
             commands::update_rule,
             commands::delete_rule,
+            commands::set_overlay_visible,
+            commands::get_overlay_alerts,
+            commands::dismiss_overlay_alert,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

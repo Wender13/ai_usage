@@ -65,4 +65,12 @@ export interface Rule extends RuleInput {
 
 export interface Settings {
   pollIntervalMinutes: number;
+  overlayEnabled: boolean;
+}
+
+export interface Alert {
+  ruleId: string;
+  channel: Channel;
+  title: string;
+  body: string;
 }
