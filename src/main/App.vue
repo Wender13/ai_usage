@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// The usage status screen is not implemented yet.
+// Provider status and rule management are not implemented yet.
 </script>
 
 <template>
