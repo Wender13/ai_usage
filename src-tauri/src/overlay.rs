@@ -141,7 +141,7 @@ pub use placement::{on_moved, on_resized};
 mod placement {
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicU64, Ordering};
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewWindow};
 
@@ -156,11 +156,16 @@ mod placement {
     const SAVE_DELAY: Duration = Duration::from_millis(500);
     /// Window managers may report a position a few pixels off the requested one.
     const OWN_MOVE_TOLERANCE: i32 = 2;
+    /// Move events of an automatic placement can arrive after a newer placement
+    /// (startup places several times in a row); moves this soon are not the user's.
+    const PLACE_GRACE: Duration = Duration::from_secs(1);
 
     #[derive(Default)]
     pub struct Placement {
         /// Last position set by the app, to tell its own moves from the user's.
         placed: Mutex<Option<PhysicalPosition<i32>>>,
+        /// When the app last placed the window.
+        placed_at: Mutex<Option<Instant>>,
         /// Bumped on every user move; a pending save runs only if no newer move arrived.
         moves: AtomicU64,
         /// Last size seen, since moving the window also reports a resize on GTK.
@@ -187,6 +192,7 @@ mod placement {
 
         if let Some(placement) = app.try_state::<Placement>() {
             *lock(&placement.placed) = Some(target);
+            *lock(&placement.placed_at) = Some(Instant::now());
         }
         let _ = window.set_position(target);
     }
@@ -199,10 +205,13 @@ mod placement {
         let Some(placement) = app.try_state::<Placement>() else {
             return;
         };
-        let own_move = lock(&placement.placed).is_some_and(|placed| {
+        let at_placed = lock(&placement.placed).is_some_and(|placed| {
             (placed.x - position.x).abs() <= OWN_MOVE_TOLERANCE
                 && (placed.y - position.y).abs() <= OWN_MOVE_TOLERANCE
         });
+        let just_placed =
+            lock(&placement.placed_at).is_some_and(|placed_at| placed_at.elapsed() < PLACE_GRACE);
+        let own_move = at_placed || just_placed;
         // A locked overlay returns to its saved position the next time it is placed.
         if own_move || app.state::<AppState>().settings().overlay.locked {
             return;
