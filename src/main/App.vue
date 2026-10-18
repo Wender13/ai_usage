@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { computed, ref } from "vue";
+import OverlaySettings from "../components/OverlaySettings.vue";
 import ProviderCard from "../components/ProviderCard.vue";
 import RuleForm from "../components/RuleForm.vue";
 import RuleList from "../components/RuleList.vue";
@@ -13,6 +14,7 @@ import type { Rule, RuleInput } from "../lib/types";
 const { snapshot, refreshing, refresh } = useUsage();
 const { rules, error: rulesError, create, update, remove } = useRules();
 const now = useNow();
+const windows = computed(() => snapshot.value?.providers.flatMap((status) => status.windows) ?? []);
 
 const formOpen = ref(false);
 /** Rule being edited; `null` while creating a new one. */
@@ -93,6 +95,13 @@ async function onRemove(rule: Rule) {
         <h2>Configurações</h2>
       </div>
       <SettingsPanel />
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <h2>Overlay</h2>
+      </div>
+      <OverlaySettings :windows="windows" />
     </section>
   </main>
 </template>

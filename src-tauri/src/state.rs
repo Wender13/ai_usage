@@ -49,6 +49,6 @@ impl AppState {
 
 /// Never panics: after a panic elsewhere the data is still structurally valid,
 /// and keeping the app running beats crashing on the next access.
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+pub fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }

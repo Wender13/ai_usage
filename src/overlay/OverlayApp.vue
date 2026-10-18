@@ -1,12 +1,54 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
+import { useNow } from "../composables/useNow";
 import { useOverlayAlerts } from "../composables/useOverlayAlerts";
+import { useSettings } from "../composables/useSettings";
 import { useUsage } from "../composables/useUsage";
-import { formatPercent, providerLabel, usageLevel, WINDOW_SHORT_LABELS } from "../lib/format";
+import {
+  formatPercent,
+  formatRemaining,
+  providerLabel,
+  usageLevel,
+  WINDOW_SHORT_LABELS,
+  windowKey,
+} from "../lib/format";
+import type { OverlayPrefs } from "../lib/types";
 
 const { snapshot } = useUsage();
 const { alerts, dismiss } = useOverlayAlerts();
+const { settings } = useSettings();
+const now = useNow();
+
+/** Used until the settings load, so the overlay never starts empty. */
+const DEFAULT_PREFS: OverlayPrefs = {
+  anchor: "top_right",
+  locked: false,
+  opacity: 86,
+  showProvider: true,
+  showLabel: true,
+  showPercent: true,
+  showReset: false,
+  hiddenWindows: [],
+};
+
+const prefs = computed(() => settings.value?.overlay ?? DEFAULT_PREFS);
+const background = computed(() => `rgba(13, 17, 23, ${prefs.value.opacity / 100})`);
+const showsWindowData = computed(
+  () => prefs.value.showLabel || prefs.value.showPercent || prefs.value.showReset,
+);
+
+/** Providers with only their visible windows; rows left with nothing to show are dropped. */
+const rows = computed(() =>
+  (snapshot.value?.providers ?? [])
+    .map((status) => ({
+      status,
+      windows: showsWindowData.value
+        ? status.windows.filter((usage) => !prefs.value.hiddenWindows.includes(windowKey(usage)))
+        : [],
+    }))
+    .filter((row) => prefs.value.showProvider || row.windows.length || row.status.error),
+);
 
 // The window follows the content size, so no empty transparent area blocks clicks.
 const root = ref<HTMLElement | null>(null);
@@ -25,7 +67,12 @@ onUnmounted(() => observer?.disconnect());
 </script>
 
 <template>
-  <div ref="root" class="overlay" data-tauri-drag-region="deep">
+  <div
+    ref="root"
+    class="overlay"
+    :style="{ background }"
+    :data-tauri-drag-region="prefs.locked ? 'false' : 'deep'"
+  >
     <button
       v-if="alerts.length"
       type="button"
@@ -42,17 +89,24 @@ onUnmounted(() => observer?.disconnect());
 
     <template v-else>
       <div
-        v-for="status in snapshot.providers"
+        v-for="{ status, windows } in rows"
         :key="status.provider"
         class="provider"
         :class="{ stale: status.error }"
         :title="status.error?.message"
       >
-        <span class="name">{{ providerLabel(status.provider) }}</span>
-        <span v-for="usage in status.windows" :key="usage.kind" class="usage">
-          <span class="kind">{{ WINDOW_SHORT_LABELS[usage.kind] }}</span>
-          <span class="percent" :class="usageLevel(usage.utilization)">
+        <span v-if="prefs.showProvider" class="name">{{ providerLabel(status.provider) }}</span>
+        <span v-for="usage in windows" :key="usage.kind" class="usage">
+          <span v-if="prefs.showLabel" class="kind">{{ WINDOW_SHORT_LABELS[usage.kind] }}</span>
+          <span v-if="prefs.showPercent" class="percent" :class="usageLevel(usage.utilization)">
             {{ formatPercent(usage.utilization) }}
+          </span>
+          <span
+            v-if="prefs.showReset && formatRemaining(usage.resetsAt, now)"
+            class="reset"
+            :class="{ separated: prefs.showLabel || prefs.showPercent }"
+          >
+            {{ formatRemaining(usage.resetsAt, now) }}
           </span>
         </span>
         <span v-if="status.error" class="warning" aria-label="Erro na última consulta">!</span>
@@ -85,7 +139,6 @@ body {
   max-width: 320px;
   padding: 8px 12px;
   border-radius: 10px;
-  background: rgba(13, 17, 23, 0.86);
   color: #e6edf3;
 }
 
@@ -120,6 +173,14 @@ body {
 
 .percent.high {
   color: #f85149;
+}
+
+.reset {
+  color: #9198a1;
+}
+
+.reset.separated::before {
+  content: "· ";
 }
 
 .stale .usage {

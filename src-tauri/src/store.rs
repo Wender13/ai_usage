@@ -4,11 +4,12 @@
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_store::StoreExt;
 
 use crate::rules::{FiredCycles, Rule};
-use crate::settings::Settings;
+use crate::settings::{SETTINGS_CHANGED, Settings};
+use crate::state::AppState;
 
 const STORE_FILE: &str = "ai-usage.json";
 
@@ -52,8 +53,19 @@ pub fn load<R: Runtime>(app: &AppHandle<R>) -> Persisted {
     }
 }
 
-pub fn save_settings<R: Runtime>(app: &AppHandle<R>, settings: &Settings) -> Result<(), String> {
-    save(app, key::SETTINGS, settings)
+/// Applies a change to the settings: saves it, then updates memory and notifies
+/// every window. Memory is left untouched if the save fails.
+pub fn change_settings<R: Runtime>(
+    app: &AppHandle<R>,
+    change: impl FnOnce(&mut Settings),
+) -> Result<Settings, String> {
+    let state = app.state::<AppState>();
+    let mut settings = state.settings().clone();
+    change(&mut settings);
+    save(app, key::SETTINGS, &settings)?;
+    *state.settings() = settings.clone();
+    let _ = app.emit(SETTINGS_CHANGED, &settings);
+    Ok(settings)
 }
 
 pub fn save_rules<R: Runtime>(app: &AppHandle<R>, rules: &[Rule]) -> Result<(), String> {

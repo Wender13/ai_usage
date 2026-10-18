@@ -93,6 +93,8 @@ pub fn run() {
             commands::update_rule,
             commands::delete_rule,
             commands::set_overlay_visible,
+            commands::update_overlay_prefs,
+            commands::set_overlay_anchor,
             commands::get_overlay_alerts,
             commands::dismiss_overlay_alert,
         ])

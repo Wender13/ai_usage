@@ -1,8 +1,14 @@
 import { onMounted, onUnmounted, ref } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import { getSettings, setOverlayVisible, updateSettings } from "../lib/api";
+import {
+  getSettings,
+  setOverlayAnchor,
+  setOverlayVisible,
+  updateOverlayPrefs,
+  updateSettings,
+} from "../lib/api";
 import { onSettingsChanged } from "../lib/events";
-import type { Settings } from "../lib/types";
+import type { Anchor, OverlayPrefs, Settings } from "../lib/types";
 import { useAttempt } from "./useAttempt";
 
 export function useSettings() {
@@ -29,5 +35,17 @@ export function useSettings() {
       settings.value = await setOverlayVisible(visible);
     });
 
-  return { settings, error, save, setOverlay };
+  /** Applies a partial change on top of the current overlay preferences. */
+  const changeOverlay = (change: Partial<OverlayPrefs>) =>
+    attempt(async () => {
+      if (!settings.value) return;
+      settings.value = await updateOverlayPrefs({ ...settings.value.overlay, ...change });
+    });
+
+  const setAnchor = (anchor: Anchor) =>
+    attempt(async () => {
+      settings.value = await setOverlayAnchor(anchor);
+    });
+
+  return { settings, error, save, setOverlay, changeOverlay, setAnchor };
 }

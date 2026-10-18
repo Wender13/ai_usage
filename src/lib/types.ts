@@ -63,9 +63,33 @@ export interface Rule extends RuleInput {
   id: string;
 }
 
+export type Anchor =
+  | "top_left"
+  | "top_center"
+  | "top_right"
+  | "bottom_left"
+  | "bottom_center"
+  | "bottom_right";
+
+export interface OverlayPrefs {
+  anchor: Anchor;
+  locked: boolean;
+  /** Background opacity, from 0 to 100. */
+  opacity: number;
+  showProvider: boolean;
+  showLabel: boolean;
+  showPercent: boolean;
+  showReset: boolean;
+  /** Keys from `windowKey`, so new windows show by default. */
+  hiddenWindows: string[];
+}
+
 export interface Settings {
   pollIntervalMinutes: number;
   overlayEnabled: boolean;
+  overlay: OverlayPrefs;
+  /** Physical position saved after dragging; `null` follows `overlay.anchor`. */
+  overlayPosition: { x: number; y: number } | null;
 }
 
 export interface Alert {

@@ -1,4 +1,4 @@
-import type { Channel, ProviderId, RuleKind, RuleType, WindowKind } from "./types";
+import type { Anchor, Channel, ProviderId, RuleKind, RuleType, UsageWindow, WindowKind } from "./types";
 
 export const PROVIDER_LABELS: Record<ProviderId, string> = {
   claude: "Claude",
@@ -12,6 +12,15 @@ export const WINDOW_LABELS: Record<WindowKind, string> = {
 export const WINDOW_SHORT_LABELS: Record<WindowKind, string> = {
   rolling_5h: "5h",
   rolling_7d: "7d",
+};
+
+export const ANCHOR_LABELS: Record<Anchor, string> = {
+  top_left: "Superior esquerdo",
+  top_center: "Superior central",
+  top_right: "Superior direito",
+  bottom_left: "Inferior esquerdo",
+  bottom_center: "Inferior central",
+  bottom_right: "Inferior direito",
 };
 
 export const RULE_TYPE_LABELS: Record<RuleType, string> = {
@@ -41,6 +50,9 @@ export const providerLabel = (id: ProviderId) => PROVIDER_LABELS[id];
 
 export const windowLabel = (kind: WindowKind) => WINDOW_LABELS[kind];
 
+/** Same key as `UsageWindow::key` in the core, e.g. "claude:rolling_5h". */
+export const windowKey = (usage: UsageWindow) => `${usage.provider}:${usage.kind}`;
+
 export const formatPercent = (value: number) => `${Math.round(value)}%`;
 
 /** Visual level used to color percentages. */
@@ -66,12 +78,22 @@ export function formatDuration(ms: number): string {
   return `${minutes}min`;
 }
 
+/** The API adds up to about a second of jitter around the reset time; use the nearest minute. */
+const resetTime = (resetsAt: string) =>
+  new Date(Math.round(Date.parse(resetsAt) / MINUTE_MS) * MINUTE_MS);
+
+/** Compact time left until the reset, e.g. "2h 10min"; `null` when unknown or already past. */
+export function formatRemaining(resetsAt: string | null, now: number): string | null {
+  if (!resetsAt) return null;
+  const remaining = resetTime(resetsAt).getTime() - now;
+  return remaining > 0 ? formatDuration(remaining) : null;
+}
+
 /** Time left until the reset plus its local clock time, e.g. "reinicia em 2h 10min (22:00)". */
 export function formatReset(resetsAt: string | null, now: number): string {
   if (!resetsAt) return "horário de reset desconhecido";
 
-  // The API adds up to about a second of jitter around the reset time; show the nearest minute.
-  const target = new Date(Math.round(Date.parse(resetsAt) / MINUTE_MS) * MINUTE_MS);
+  const target = resetTime(resetsAt);
   const remaining = target.getTime() - now;
   if (remaining <= 0) return "reiniciando…";
 

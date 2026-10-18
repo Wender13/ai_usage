@@ -1,9 +1,9 @@
-use tauri::{AppHandle, Emitter, Runtime, State};
+use tauri::{AppHandle, Runtime, State};
 use uuid::Uuid;
 
 use crate::domain::UsageSnapshot;
 use crate::rules::{Alert, Rule, RuleInput};
-use crate::settings::{SETTINGS_CHANGED, Settings};
+use crate::settings::{Anchor, OverlayPrefs, Settings, validate_poll_interval};
 use crate::state::AppState;
 use crate::{overlay, store};
 
@@ -24,23 +24,20 @@ pub fn get_settings(state: State<'_, AppState>) -> Settings {
     state.settings().clone()
 }
 
-/// Overlay visibility is ignored here; it only changes through `set_overlay_visible`,
-/// so a window holding stale settings cannot revert a toggle made from the tray.
+/// Only the poll interval is taken from `settings`; the other fields have their own
+/// commands, so a window holding stale settings cannot revert changes made elsewhere.
 #[tauri::command]
 pub fn update_settings<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
     settings: Settings,
 ) -> Result<Settings, String> {
-    let mut next = state.settings().clone();
-    next.poll_interval_minutes = settings.poll_interval_minutes;
-    next.validate()?;
-    store::save_settings(&app, &next)?;
-    *state.settings() = next.clone();
-    let _ = app.emit(SETTINGS_CHANGED, &next);
+    let interval = settings.poll_interval_minutes;
+    validate_poll_interval(interval)?;
+    let saved = store::change_settings(&app, |current| current.poll_interval_minutes = interval)?;
     // Restarts the wait so the new interval applies now (this also polls once).
     state.poller.refresh_now();
-    Ok(next)
+    Ok(saved)
 }
 
 #[tauri::command]
@@ -49,6 +46,24 @@ pub fn set_overlay_visible<R: Runtime>(
     visible: bool,
 ) -> Result<Settings, String> {
     overlay::set_enabled(&app, visible)
+}
+
+/// Changes what the overlay shows and how it looks; the anchor and the saved
+/// position are kept, since they change through `set_overlay_anchor` and dragging.
+#[tauri::command]
+pub fn update_overlay_prefs<R: Runtime>(
+    app: AppHandle<R>,
+    prefs: OverlayPrefs,
+) -> Result<Settings, String> {
+    overlay::update_prefs(&app, prefs)
+}
+
+#[tauri::command]
+pub fn set_overlay_anchor<R: Runtime>(
+    app: AppHandle<R>,
+    anchor: Anchor,
+) -> Result<Settings, String> {
+    overlay::set_anchor(&app, anchor)
 }
 
 #[tauri::command]

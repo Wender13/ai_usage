@@ -15,19 +15,22 @@ pub fn show_main<R: Runtime>(app: &AppHandle<R>) {
 /// Closing the main window hides it; the app keeps running in the tray until "Sair".
 /// Closing the overlay (e.g. Alt+F4) turns it off, like the tray toggle.
 pub fn handle_event<R: Runtime>(window: &Window<R>, event: &WindowEvent) {
-    let WindowEvent::CloseRequested { api, .. } = event else {
-        return;
-    };
-    match window.label() {
-        MAIN => {
+    match (window.label(), event) {
+        (MAIN, WindowEvent::CloseRequested { api, .. }) => {
             api.prevent_close();
             let _ = window.hide();
         }
-        overlay::LABEL => {
+        (overlay::LABEL, WindowEvent::CloseRequested { api, .. }) => {
             api.prevent_close();
             if let Err(error) = overlay::set_enabled(window.app_handle(), false) {
                 eprintln!("{error}");
             }
+        }
+        (overlay::LABEL, WindowEvent::Moved(position)) => {
+            overlay::on_moved(window.app_handle(), *position);
+        }
+        (overlay::LABEL, WindowEvent::Resized(size)) => {
+            overlay::on_resized(window.app_handle(), *size);
         }
         _ => {}
     }
