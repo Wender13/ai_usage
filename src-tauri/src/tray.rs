@@ -1,9 +1,10 @@
 use tauri::{
-    AppHandle, Runtime,
+    AppHandle, Manager, Runtime,
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
 };
 
+use crate::state::AppState;
 use crate::windows;
 
 const TRAY_ID: &str = "main";
@@ -17,7 +18,7 @@ mod item {
 
 pub fn create<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, item::OPEN, "Abrir janela", true, None::<&str>)?;
-    // Overlay and refresh stay disabled until their features exist.
+    // The overlay item stays disabled until the overlay window exists.
     let overlay = CheckMenuItem::with_id(
         app,
         item::TOGGLE_OVERLAY,
@@ -26,7 +27,7 @@ pub fn create<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         false,
         None::<&str>,
     )?;
-    let refresh = MenuItem::with_id(app, item::REFRESH, "Atualizar agora", false, None::<&str>)?;
+    let refresh = MenuItem::with_id(app, item::REFRESH, "Atualizar agora", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, item::QUIT, "Sair", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &overlay, &refresh, &separator, &quit])?;
@@ -36,6 +37,7 @@ pub fn create<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .menu(&menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             item::OPEN => windows::show_main(app),
+            item::REFRESH => app.state::<AppState>().poller.refresh_now(),
             item::QUIT => app.exit(0),
             _ => {}
         });

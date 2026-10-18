@@ -1,7 +1,23 @@
+mod commands;
+mod domain;
+mod error;
+mod poller;
+mod providers;
+mod state;
 #[cfg(desktop)]
 mod tray;
 #[cfg(desktop)]
 mod windows;
+
+use std::sync::Arc;
+
+use tauri::Manager;
+
+use domain::UsageSnapshot;
+use poller::PollerHandle;
+use providers::UsageProvider;
+use providers::claude::ClaudeOAuthProvider;
+use state::AppState;
 
 /// Command-line flag used to start the app with only the tray icon (no main window).
 #[cfg(desktop)]
@@ -19,6 +35,17 @@ pub fn run() {
 
     builder
         .setup(|app| {
+            // Without a home directory the path is empty and the provider reports missing credentials.
+            let home = app.path().home_dir().unwrap_or_default();
+            let providers: Vec<Arc<dyn UsageProvider>> = vec![Arc::new(ClaudeOAuthProvider::new(
+                ClaudeOAuthProvider::credentials_path(&home),
+            )?)];
+
+            let poller = PollerHandle::default();
+            let snapshot = UsageSnapshot::new(providers.iter().map(|p| p.id()));
+            app.manage(AppState::new(snapshot, poller.clone()));
+            poller::spawn(app.handle().clone(), providers, poller);
+
             #[cfg(desktop)]
             {
                 tray::create(app.handle())?;
@@ -27,8 +54,6 @@ pub fn run() {
                     windows::show_main(app.handle());
                 }
             }
-            #[cfg(mobile)]
-            let _ = app;
 
             Ok(())
         })
@@ -38,6 +63,10 @@ pub fn run() {
             #[cfg(mobile)]
             let _ = (window, event);
         })
+        .invoke_handler(tauri::generate_handler![
+            commands::get_snapshot,
+            commands::refresh_now
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
