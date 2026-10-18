@@ -193,6 +193,9 @@ mod placement {
 
     /// Saves where the user dragged the overlay, unless the position is locked.
     pub fn on_moved<R: Runtime>(app: &AppHandle<R>, position: PhysicalPosition<i32>) {
+        if !positions_known() {
+            return;
+        }
         let Some(placement) = app.try_state::<Placement>() else {
             return;
         };
@@ -226,6 +229,20 @@ mod placement {
                 eprintln!("{error}");
             }
         });
+    }
+
+    /// Wayland compositors do not tell clients where their windows are, so moves there
+    /// arrive as (0, 0) and saving them would pin the overlay to a corner.
+    fn positions_known() -> bool {
+        #[cfg(target_os = "linux")]
+        {
+            std::env::var_os("WAYLAND_DISPLAY").is_none()
+                || std::env::var("GDK_BACKEND").is_ok_and(|backend| backend.starts_with("x11"))
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            true
+        }
     }
 
     /// Keeps an anchored overlay in its corner when its content changes size, so a
