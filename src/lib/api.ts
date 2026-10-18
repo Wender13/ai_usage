@@ -27,6 +27,9 @@ export const updateOverlayPrefs = (prefs: OverlayPrefs) =>
 export const setOverlayAnchor = (anchor: Anchor) =>
   invoke<Settings>("set_overlay_anchor", { anchor });
 
+export const setUseXwayland = (enabled: boolean) =>
+  invoke<Settings>("set_use_xwayland", { enabled });
+
 export const getOverlayAlerts = () => invoke<Alert[]>("get_overlay_alerts");
 
 export const dismissOverlayAlert = () => invoke<void>("dismiss_overlay_alert");

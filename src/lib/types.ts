@@ -90,6 +90,7 @@ export interface Settings {
   overlay: OverlayPrefs;
   /** Physical position saved after dragging; `null` follows `overlay.anchor`. */
   overlayPosition: { x: number; y: number } | null;
+  useXwayland: boolean;
 }
 
 export interface Alert {

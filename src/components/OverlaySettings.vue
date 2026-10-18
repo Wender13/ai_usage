@@ -9,7 +9,7 @@ defineProps<{
   windows: UsageWindow[];
 }>();
 
-const { settings, error, setOverlay, changeOverlay, setAnchor } = useSettings();
+const { settings, error, setOverlay, changeOverlay, setAnchor, setXwayland } = useSettings();
 
 const anchorOptions = Object.keys(ANCHOR_LABELS) as Anchor[];
 const CUSTOM = "custom";
@@ -20,6 +20,9 @@ const FIELDS: { key: keyof OverlayPrefs & `show${string}`; label: string }[] = [
   { key: "showPercent", label: "Percentual" },
   { key: "showReset", label: "Tempo até o reset" },
 ];
+
+// Positioning only works on X11, so the XWayland option matters only on Linux.
+const isLinux = navigator.userAgent.includes("Linux");
 
 const prefs = computed(() => settings.value?.overlay);
 const position = computed(() =>
@@ -122,6 +125,20 @@ function onWindowToggle(usage: UsageWindow, visible: boolean) {
         </label>
       </fieldset>
 
+      <div v-if="isLinux">
+        <label class="row">
+          <input
+            type="checkbox"
+            :checked="settings.useXwayland"
+            @change="setXwayland(checked($event))"
+          />
+          <span>Usar XWayland</span>
+        </label>
+        <p class="hint">
+          No GNOME em Wayland, posição, trava e "sempre no topo" só funcionam via XWayland. Vale
+          depois de reiniciar o app.
+        </p>
+      </div>
     </template>
   </div>
   <p v-if="error" class="error">{{ error }}</p>
@@ -166,4 +183,9 @@ legend {
   font-size: 0.875rem;
 }
 
+.hint {
+  margin: 4px 0 0 24px;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
 </style>

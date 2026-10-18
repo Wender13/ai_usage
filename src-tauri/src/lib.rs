@@ -31,6 +31,10 @@ const HIDDEN_FLAG: &str = "--hidden";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let context = tauri::generate_context!();
+    #[cfg(target_os = "linux")]
+    prefer_xwayland(&context.config().identifier);
+
     let builder = tauri::Builder::default();
 
     // Must be the first plugin registered: a second launch only focuses the running instance.
@@ -95,9 +99,22 @@ pub fn run() {
             commands::set_overlay_visible,
             commands::update_overlay_prefs,
             commands::set_overlay_anchor,
+            commands::set_use_xwayland,
             commands::get_overlay_alerts,
             commands::dismiss_overlay_alert,
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
+}
+
+/// GNOME on Wayland ignores positioning and always-on-top, so the overlay controls
+/// only work through XWayland. The backend must be chosen before GTK starts.
+#[cfg(target_os = "linux")]
+fn prefer_xwayland(identifier: &str) {
+    let on_wayland = std::env::var_os("WAYLAND_DISPLAY").is_some();
+    let backend_chosen = std::env::var_os("GDK_BACKEND").is_some();
+    if on_wayland && !backend_chosen && store::xwayland_preference(identifier) {
+        // SAFETY: runs before Tauri starts, while the process is still single-threaded.
+        unsafe { std::env::set_var("GDK_BACKEND", "x11") };
+    }
 }

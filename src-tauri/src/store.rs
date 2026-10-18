@@ -68,6 +68,26 @@ pub fn change_settings<R: Runtime>(
     Ok(settings)
 }
 
+/// Reads `useXwayland` straight from the store file, since it must be known before
+/// Tauri (and GTK) starts. The path mirrors Tauri's app data directory on Linux.
+#[cfg(target_os = "linux")]
+pub fn xwayland_preference(identifier: &str) -> bool {
+    use std::path::PathBuf;
+
+    let data_dir = std::env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .filter(|dir| dir.is_absolute())
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share")));
+    let Some(path) = data_dir.map(|dir| dir.join(identifier).join(STORE_FILE)) else {
+        return false;
+    };
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+        .and_then(|root| root.get(key::SETTINGS)?.get("useXwayland")?.as_bool())
+        .unwrap_or(false)
+}
+
 pub fn save_rules<R: Runtime>(app: &AppHandle<R>, rules: &[Rule]) -> Result<(), String> {
     save(app, key::RULES, rules)
 }

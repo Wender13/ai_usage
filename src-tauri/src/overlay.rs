@@ -1,5 +1,6 @@
 //! Compact window with the current percentages and the alerts of overlay-channel rules.
-//! GNOME on Wayland ignores always-on-top and positioning for it; see the README.
+//! GNOME on Wayland ignores always-on-top and positioning for it unless the app runs
+//! through XWayland (see `Settings::use_xwayland`).
 
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 

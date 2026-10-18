@@ -4,6 +4,7 @@ import {
   getSettings,
   setOverlayAnchor,
   setOverlayVisible,
+  setUseXwayland,
   updateOverlayPrefs,
   updateSettings,
 } from "../lib/api";
@@ -47,5 +48,10 @@ export function useSettings() {
       settings.value = await setOverlayAnchor(anchor);
     });
 
-  return { settings, error, save, setOverlay, changeOverlay, setAnchor };
+  const setXwayland = (enabled: boolean) =>
+    attempt(async () => {
+      settings.value = await setUseXwayland(enabled);
+    });
+
+  return { settings, error, save, setOverlay, changeOverlay, setAnchor, setXwayland };
 }

@@ -16,6 +16,9 @@ pub struct Settings {
     /// Physical top-left position after the user moved the overlay;
     /// `None` places it at `overlay.anchor`.
     pub overlay_position: Option<OverlayPosition>,
+    /// Linux only: run through XWayland, where positioning and always-on-top
+    /// work. Read at startup, so a change applies after a restart.
+    pub use_xwayland: bool,
 }
 
 impl Default for Settings {
@@ -25,6 +28,7 @@ impl Default for Settings {
             overlay_enabled: false,
             overlay: OverlayPrefs::default(),
             overlay_position: None,
+            use_xwayland: false,
         }
     }
 }
@@ -119,6 +123,7 @@ mod tests {
         assert!(!settings.overlay_enabled);
         assert_eq!(settings.overlay, OverlayPrefs::default());
         assert_eq!(settings.overlay_position, None);
+        assert!(!settings.use_xwayland);
     }
 
     #[test]

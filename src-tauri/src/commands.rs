@@ -66,6 +66,12 @@ pub fn set_overlay_anchor<R: Runtime>(
     overlay::set_anchor(&app, anchor)
 }
 
+/// Takes effect on the next start: the display backend is chosen before GTK starts.
+#[tauri::command]
+pub fn set_use_xwayland<R: Runtime>(app: AppHandle<R>, enabled: bool) -> Result<Settings, String> {
+    store::change_settings(&app, |settings| settings.use_xwayland = enabled)
+}
+
 #[tauri::command]
 pub fn get_overlay_alerts<R: Runtime>(app: AppHandle<R>) -> Vec<Alert> {
     overlay::alerts(&app)
