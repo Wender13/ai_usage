@@ -1,9 +1,13 @@
+mod alerts;
 mod commands;
 mod domain;
 mod error;
 mod poller;
 mod providers;
+mod rules;
+mod settings;
 mod state;
+mod store;
 #[cfg(desktop)]
 mod tray;
 #[cfg(desktop)]
@@ -17,6 +21,7 @@ use domain::UsageSnapshot;
 use poller::PollerHandle;
 use providers::UsageProvider;
 use providers::claude::ClaudeOAuthProvider;
+use rules::{RuleBook, RuleState};
 use state::AppState;
 
 /// Command-line flag used to start the app with only the tray icon (no main window).
@@ -34,6 +39,8 @@ pub fn run() {
     }));
 
     builder
+        .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             // Without a home directory the path is empty and the provider reports missing credentials.
             let home = app.path().home_dir().unwrap_or_default();
@@ -41,9 +48,19 @@ pub fn run() {
                 ClaudeOAuthProvider::credentials_path(&home),
             )?)];
 
-            let poller = PollerHandle::default();
+            let persisted = store::load(app.handle());
+            let rule_book = RuleBook {
+                rules: persisted.rules,
+                state: RuleState::with_fired(persisted.fired),
+            };
             let snapshot = UsageSnapshot::new(providers.iter().map(|p| p.id()));
-            app.manage(AppState::new(snapshot, poller.clone()));
+            let poller = PollerHandle::default();
+            app.manage(AppState::new(
+                snapshot,
+                persisted.settings,
+                rule_book,
+                poller.clone(),
+            ));
             poller::spawn(app.handle().clone(), providers, poller);
 
             #[cfg(desktop)]
@@ -65,7 +82,13 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_snapshot,
-            commands::refresh_now
+            commands::refresh_now,
+            commands::get_settings,
+            commands::update_settings,
+            commands::list_rules,
+            commands::create_rule,
+            commands::update_rule,
+            commands::delete_rule,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

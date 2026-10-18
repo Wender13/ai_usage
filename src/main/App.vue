@@ -1,11 +1,45 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import ProviderCard from "../components/ProviderCard.vue";
+import RuleForm from "../components/RuleForm.vue";
+import RuleList from "../components/RuleList.vue";
+import SettingsPanel from "../components/SettingsPanel.vue";
 import { useNow } from "../composables/useNow";
+import { useRules } from "../composables/useRules";
 import { useUsage } from "../composables/useUsage";
 import { formatTime } from "../lib/format";
+import type { Rule, RuleInput } from "../lib/types";
 
 const { snapshot, refreshing, refresh } = useUsage();
+const { rules, error: rulesError, create, update, remove } = useRules();
 const now = useNow();
+
+const formOpen = ref(false);
+/** Rule being edited; `null` while creating a new one. */
+const editingRule = ref<Rule | null>(null);
+
+function openForm(rule: Rule | null) {
+  editingRule.value = rule;
+  formOpen.value = true;
+}
+
+function closeForm() {
+  formOpen.value = false;
+  editingRule.value = null;
+}
+
+async function onSubmit(input: RuleInput) {
+  const saved = editingRule.value
+    ? await update({ ...input, id: editingRule.value.id })
+    : await create(input);
+  if (saved) closeForm();
+}
+
+const onToggle = (rule: Rule) => update({ ...rule, enabled: !rule.enabled });
+
+async function onRemove(rule: Rule) {
+  if ((await remove(rule.id)) && editingRule.value?.id === rule.id) closeForm();
+}
 </script>
 
 <template>
@@ -32,6 +66,34 @@ const now = useNow();
       :now="now"
     />
 
+    <section class="section">
+      <div class="section-header">
+        <h2>Regras</h2>
+        <button v-if="!formOpen" type="button" @click="openForm(null)">Nova regra</button>
+      </div>
+      <p v-if="rulesError" class="error">{{ rulesError }}</p>
+      <RuleForm
+        v-if="formOpen"
+        :key="editingRule?.id ?? 'new'"
+        :rule="editingRule ?? undefined"
+        @submit="onSubmit"
+        @cancel="closeForm"
+      />
+      <RuleList
+        :rules="rules"
+        :editing-id="editingRule?.id ?? null"
+        @edit="openForm"
+        @toggle="onToggle"
+        @remove="onRemove"
+      />
+    </section>
+
+    <section class="section">
+      <div class="section-header">
+        <h2>Configurações</h2>
+      </div>
+      <SettingsPanel />
+    </section>
   </main>
 </template>
 
@@ -166,5 +228,21 @@ h1 {
   margin: 2px 0 0;
   color: var(--muted);
   font-size: 0.8125rem;
+}
+
+.section {
+  margin-top: 24px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+h2 {
+  margin: 0;
+  font-size: 1rem;
 }
 </style>

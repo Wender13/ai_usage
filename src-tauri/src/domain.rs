@@ -1,20 +1,52 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::error::ProviderError;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ProviderId {
     Claude,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+impl ProviderId {
+    /// Same value as the serialized form.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Claude => "claude",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Claude => "Claude",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum WindowKind {
     #[serde(rename = "rolling_5h")]
     Rolling5h,
     #[serde(rename = "rolling_7d")]
     Rolling7d,
+}
+
+impl WindowKind {
+    /// Same value as the serialized form.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Rolling5h => "rolling_5h",
+            Self::Rolling7d => "rolling_7d",
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Rolling5h => "Sessão (5h)",
+            Self::Rolling7d => "Semanal (7 dias)",
+        }
+    }
 }
 
 /// One usage limit window of a provider.
@@ -26,6 +58,17 @@ pub struct UsageWindow {
     /// Percentage of the limit used, from 0 to 100.
     pub utilization: f64,
     pub resets_at: Option<DateTime<Utc>>,
+}
+
+impl UsageWindow {
+    /// Identifies the window across polls, e.g. `claude:rolling_5h`.
+    pub fn key(&self) -> String {
+        format!("{}:{}", self.provider.as_str(), self.kind.as_str())
+    }
+
+    pub fn label(&self) -> String {
+        format!("{} · {}", self.provider.label(), self.kind.label())
+    }
 }
 
 /// Latest known state of a provider. On error, the windows from the last
@@ -100,6 +143,15 @@ mod tests {
             kind: WindowKind::Rolling5h,
             utilization,
             resets_at: None,
+        }
+    }
+
+    #[test]
+    fn as_str_matches_serialized_form() {
+        let provider = ProviderId::Claude;
+        assert_eq!(serde_json::to_value(provider).unwrap(), provider.as_str());
+        for kind in [WindowKind::Rolling5h, WindowKind::Rolling7d] {
+            assert_eq!(serde_json::to_value(kind).unwrap(), kind.as_str());
         }
     }
 

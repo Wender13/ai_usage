@@ -40,3 +40,29 @@ export interface UsageSnapshot {
   fetchedAt: string | null;
   providers: ProviderStatus[];
 }
+
+// Mirrors src-tauri/src/rules/model.rs and settings.rs.
+
+export type Channel = "notification" | "overlay" | "both";
+
+/** In `provider` and `window`, `null` means "any". */
+export type RuleKind =
+  | { type: "threshold"; provider: ProviderId | null; window: WindowKind | null; percent: number }
+  | { type: "interval"; minutes: number }
+  | { type: "beforeReset"; provider: ProviderId | null; window: WindowKind | null; minutes: number };
+
+export type RuleType = RuleKind["type"];
+
+export interface RuleInput {
+  enabled: boolean;
+  channel: Channel;
+  kind: RuleKind;
+}
+
+export interface Rule extends RuleInput {
+  id: string;
+}
+
+export interface Settings {
+  pollIntervalMinutes: number;
+}
