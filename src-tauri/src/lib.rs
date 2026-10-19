@@ -1,4 +1,6 @@
 mod alerts;
+#[cfg(desktop)]
+mod cli;
 mod commands;
 mod domain;
 mod error;
@@ -25,10 +27,6 @@ use providers::claude::ClaudeOAuthProvider;
 use rules::{RuleBook, RuleState};
 use state::AppState;
 
-/// Command-line flag used to start the app with only the tray icon (no main window).
-#[cfg(desktop)]
-const HIDDEN_FLAG: &str = "--hidden";
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let context = tauri::generate_context!();
@@ -39,8 +37,8 @@ pub fn run() {
 
     // Must be the first plugin registered: a second launch only focuses the running instance.
     #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-        windows::show_main(app);
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+        cli::Launch::parse(&args).apply(app);
     }));
 
     builder
@@ -74,9 +72,8 @@ pub fn run() {
                 overlay::sync_visibility(app.handle());
                 tray::create(app.handle())?;
 
-                if !std::env::args().any(|arg| arg == HIDDEN_FLAG) {
-                    windows::show_main(app.handle());
-                }
+                let args: Vec<String> = std::env::args().collect();
+                cli::Launch::parse(&args).apply(app.handle());
             }
 
             Ok(())
