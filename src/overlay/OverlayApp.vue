@@ -10,9 +10,10 @@ import {
   formatRemaining,
   providerLabel,
   usageLevel,
-  WINDOW_SHORT_LABELS,
   windowKey,
+  windowShortLabel,
 } from "../lib/format";
+import { t } from "../i18n";
 import type { OverlayPrefs } from "../lib/types";
 
 const { snapshot } = useUsage();
@@ -77,15 +78,17 @@ onUnmounted(() => observer?.disconnect());
       v-if="alerts.length"
       type="button"
       class="alert"
-      title="Clique para dispensar"
+      :title="t('overlay.dismiss')"
       @click="dismiss"
     >
       <span class="alert-title">{{ alerts[0].title }}</span>
       <span class="alert-body">{{ alerts[0].body }}</span>
-      <span v-if="alerts.length > 1" class="alert-more">+{{ alerts.length - 1 }} alerta(s)</span>
+      <span v-if="alerts.length > 1" class="alert-more">
+        {{ t("overlay.moreAlerts", { count: alerts.length - 1 }) }}
+      </span>
     </button>
 
-    <div v-if="!snapshot?.fetchedAt" class="provider muted">Carregando…</div>
+    <div v-if="!snapshot?.fetchedAt" class="provider muted">{{ t("status.loading") }}</div>
 
     <template v-else>
       <div
@@ -97,7 +100,7 @@ onUnmounted(() => observer?.disconnect());
       >
         <span v-if="prefs.showProvider" class="name">{{ providerLabel(status.provider) }}</span>
         <span v-for="usage in windows" :key="usage.kind" class="usage">
-          <span v-if="prefs.showLabel" class="kind">{{ WINDOW_SHORT_LABELS[usage.kind] }}</span>
+          <span v-if="prefs.showLabel" class="kind">{{ windowShortLabel(usage.kind) }}</span>
           <span v-if="prefs.showPercent" class="percent" :class="usageLevel(usage.utilization)">
             {{ formatPercent(usage.utilization) }}
           </span>
@@ -109,7 +112,7 @@ onUnmounted(() => observer?.disconnect());
             {{ formatRemaining(usage.resetsAt, now) }}
           </span>
         </span>
-        <span v-if="status.error" class="warning" aria-label="Erro na última consulta">!</span>
+        <span v-if="status.error" class="warning" :aria-label="t('overlay.lastCheckFailed')">!</span>
       </div>
     </template>
   </div>

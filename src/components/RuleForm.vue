@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { reactive } from "vue";
-import { CHANNEL_LABELS, PROVIDER_LABELS, RULE_TYPE_LABELS, WINDOW_LABELS } from "../lib/format";
-import type {
-  Channel,
-  ProviderId,
-  Rule,
-  RuleInput,
-  RuleKind,
-  RuleType,
-  WindowKind,
-} from "../lib/types";
+import { t } from "../i18n";
+import {
+  CHANNELS,
+  channelLabel,
+  PROVIDERS,
+  providerLabel,
+  RULE_TYPES,
+  ruleTypeLabel,
+  WINDOW_KINDS,
+  windowLabel,
+} from "../lib/format";
+import type { Rule, RuleInput, RuleKind } from "../lib/types";
 
 const props = defineProps<{
   /** Rule being edited; absent when creating. */
@@ -21,10 +23,6 @@ const emit = defineEmits<{
   cancel: [];
 }>();
 
-const typeOptions = Object.keys(RULE_TYPE_LABELS) as RuleType[];
-const providerOptions = Object.keys(PROVIDER_LABELS) as ProviderId[];
-const windowOptions = Object.keys(WINDOW_LABELS) as WindowKind[];
-const channelOptions = Object.keys(CHANNEL_LABELS) as Channel[];
 
 const kind = props.rule?.kind;
 const form = reactive({
@@ -70,67 +68,67 @@ function onSubmit() {
 <template>
   <form class="rule-form" @submit.prevent="onSubmit">
     <label class="field">
-      <span>Tipo</span>
+      <span>{{ t("rules.form.type") }}</span>
       <select v-model="form.type">
-        <option v-for="type in typeOptions" :key="type" :value="type">
-          {{ RULE_TYPE_LABELS[type] }}
+        <option v-for="type in RULE_TYPES" :key="type" :value="type">
+          {{ ruleTypeLabel(type) }}
         </option>
       </select>
     </label>
 
     <template v-if="form.type !== 'interval'">
       <label class="field">
-        <span>Provider</span>
+        <span>{{ t("rules.form.provider") }}</span>
         <select v-model="form.provider">
-          <option :value="null">Qualquer</option>
-          <option v-for="provider in providerOptions" :key="provider" :value="provider">
-            {{ PROVIDER_LABELS[provider] }}
+          <option :value="null">{{ t("rules.form.any") }}</option>
+          <option v-for="provider in PROVIDERS" :key="provider" :value="provider">
+            {{ providerLabel(provider) }}
           </option>
         </select>
       </label>
 
       <label class="field">
-        <span>Janela</span>
+        <span>{{ t("rules.form.window") }}</span>
         <select v-model="form.window">
-          <option :value="null">Qualquer</option>
-          <option v-for="window in windowOptions" :key="window" :value="window">
-            {{ WINDOW_LABELS[window] }}
+          <option :value="null">{{ t("rules.form.any") }}</option>
+          <option v-for="window in WINDOW_KINDS" :key="window" :value="window">
+            {{ windowLabel(window) }}
           </option>
         </select>
       </label>
     </template>
 
     <label v-if="form.type === 'threshold'" class="field">
-      <span>Limiar (%)</span>
+      <span>{{ t("rules.form.threshold") }}</span>
       <input v-model.number="form.percent" type="number" min="1" max="100" step="1" required />
     </label>
 
     <label v-if="form.type === 'interval'" class="field">
-      <span>A cada (min)</span>
+      <span>{{ t("rules.form.every") }}</span>
       <input v-model.number="form.intervalMinutes" type="number" min="1" step="1" required />
     </label>
 
     <label v-if="form.type === 'beforeReset'" class="field">
-      <span>Minutos antes do reset</span>
+      <span>{{ t("rules.form.minutesBefore") }}</span>
       <input v-model.number="form.beforeResetMinutes" type="number" min="1" step="1" required />
     </label>
 
     <label class="field">
-      <span>Canal</span>
+      <span>{{ t("rules.form.channel") }}</span>
       <select v-model="form.channel">
-        <option v-for="channel in channelOptions" :key="channel" :value="channel">
-          {{ CHANNEL_LABELS[channel] }}
+        <option v-for="channel in CHANNELS" :key="channel" :value="channel">
+          {{ channelLabel(channel) }}
         </option>
       </select>
     </label>
 
     <p v-if="form.type !== 'threshold'" class="hint">
-      Verificada a cada consulta de uso, então a precisão é a do intervalo de consulta.
+      {{ t("rules.form.hint") }}
     </p>
 
     <div class="actions">
-      <button type="button" @click="emit('cancel')">Cancelar</button>
-      <button type="submit" class="primary">{{ rule ? "Salvar" : "Criar regra" }}</button>
+      <button type="button" @click="emit('cancel')">{{ t("rules.form.cancel") }}</button>
+      <button type="submit" class="primary">{{ rule ? t("rules.form.save") : t("rules.form.create") }}</button>
     </div>
   </form>
 </template>

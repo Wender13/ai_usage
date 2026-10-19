@@ -8,6 +8,7 @@ import SettingsPanel from "../components/SettingsPanel.vue";
 import { useNow } from "../composables/useNow";
 import { useRules } from "../composables/useRules";
 import { useUsage } from "../composables/useUsage";
+import { t } from "../i18n";
 import { formatTime } from "../lib/format";
 import type { Rule, RuleInput } from "../lib/types";
 
@@ -51,13 +52,13 @@ async function onRemove(rule: Rule) {
         <h1>AI Usage</h1>
         <p class="meta">
           <template v-if="snapshot?.fetchedAt">
-            Última consulta às {{ formatTime(snapshot.fetchedAt) }}
+            {{ t("app.lastCheck", { time: formatTime(snapshot.fetchedAt) }) }}
           </template>
-          <template v-else>Aguardando a primeira consulta…</template>
+          <template v-else>{{ t("app.waiting") }}</template>
         </p>
       </div>
       <button type="button" :disabled="refreshing" @click="refresh">
-        {{ refreshing ? "Atualizando…" : "Atualizar" }}
+        {{ refreshing ? t("app.refreshing") : t("app.refresh") }}
       </button>
     </header>
 
@@ -70,8 +71,10 @@ async function onRemove(rule: Rule) {
 
     <section class="section">
       <div class="section-header">
-        <h2>Regras</h2>
-        <button v-if="!formOpen" type="button" @click="openForm(null)">Nova regra</button>
+        <h2>{{ t("sections.rules") }}</h2>
+        <button v-if="!formOpen" type="button" @click="openForm(null)">
+          {{ t("rules.new") }}
+        </button>
       </div>
       <p v-if="rulesError" class="error">{{ rulesError }}</p>
       <RuleForm
@@ -92,14 +95,14 @@ async function onRemove(rule: Rule) {
 
     <section class="section">
       <div class="section-header">
-        <h2>Configurações</h2>
+        <h2>{{ t("sections.settings") }}</h2>
       </div>
       <SettingsPanel />
     </section>
 
     <section class="section">
       <div class="section-header">
-        <h2>Overlay</h2>
+        <h2>{{ t("sections.overlay") }}</h2>
       </div>
       <OverlaySettings :windows="windows" />
     </section>

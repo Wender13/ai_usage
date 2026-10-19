@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { CHANNEL_LABELS, describeRule } from "../lib/format";
+import { t } from "../i18n";
+import { channelLabel, describeRule } from "../lib/format";
 import type { Rule } from "../lib/types";
 
 defineProps<{
@@ -15,7 +16,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <p v-if="!rules.length" class="empty">Nenhuma regra cadastrada.</p>
+  <p v-if="!rules.length" class="empty">{{ t("rules.empty") }}</p>
 
   <ul v-else class="rules">
     <li
@@ -26,16 +27,16 @@ const emit = defineEmits<{
       <input
         type="checkbox"
         :checked="rule.enabled"
-        :aria-label="rule.enabled ? 'Desativar regra' : 'Ativar regra'"
+        :aria-label="rule.enabled ? t('rules.disable') : t('rules.enable')"
         @change="emit('toggle', rule)"
       />
       <div class="text">
         <span>{{ describeRule(rule.kind) }}</span>
-        <span class="channel">{{ CHANNEL_LABELS[rule.channel] }}</span>
+        <span class="channel">{{ channelLabel(rule.channel) }}</span>
       </div>
       <div class="actions">
-        <button type="button" @click="emit('edit', rule)">Editar</button>
-        <button type="button" class="danger" @click="emit('remove', rule)">Excluir</button>
+        <button type="button" @click="emit('edit', rule)">{{ t("rules.edit") }}</button>
+        <button type="button" class="danger" @click="emit('remove', rule)">{{ t("rules.delete") }}</button>
       </div>
     </li>
   </ul>

@@ -1,5 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Alert, Anchor, OverlayPrefs, Rule, RuleInput, Settings, UsageSnapshot } from "./types";
+import type {
+  Alert,
+  Anchor,
+  LanguageInfo,
+  LanguagePref,
+  OverlayPrefs,
+  Rule,
+  RuleInput,
+  Settings,
+  UsageSnapshot,
+} from "./types";
 
 export const getSnapshot = () => invoke<UsageSnapshot>("get_snapshot");
 
@@ -29,6 +39,11 @@ export const setOverlayAnchor = (anchor: Anchor) =>
 
 export const setUseXwayland = (enabled: boolean) =>
   invoke<Settings>("set_use_xwayland", { enabled });
+
+export const getLanguage = () => invoke<LanguageInfo>("get_language");
+
+export const setLanguage = (language: LanguagePref) =>
+  invoke<LanguageInfo>("set_language", { language });
 
 export const getOverlayAlerts = () => invoke<Alert[]>("get_overlay_alerts");
 

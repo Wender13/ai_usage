@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useSettings } from "../composables/useSettings";
-import { ANCHOR_LABELS, providerLabel, windowKey, windowLabel } from "../lib/format";
+import { t } from "../i18n";
+import { ANCHORS, anchorLabel, providerLabel, windowKey, windowLabel } from "../lib/format";
 import type { Anchor, OverlayPrefs, UsageWindow } from "../lib/types";
 
 defineProps<{
@@ -11,15 +12,10 @@ defineProps<{
 
 const { settings, error, setOverlay, changeOverlay, setAnchor, setXwayland } = useSettings();
 
-const anchorOptions = Object.keys(ANCHOR_LABELS) as Anchor[];
 const CUSTOM = "custom";
 
-const FIELDS: { key: keyof OverlayPrefs & `show${string}`; label: string }[] = [
-  { key: "showProvider", label: "Nome do provider" },
-  { key: "showLabel", label: "Nome da janela (5h, 7d)" },
-  { key: "showPercent", label: "Percentual" },
-  { key: "showReset", label: "Tempo até o reset" },
-];
+type FieldKey = keyof OverlayPrefs & `show${string}`;
+const FIELDS: FieldKey[] = ["showProvider", "showLabel", "showPercent", "showReset"];
 
 // Positioning only works on X11, so the XWayland option matters only on Linux.
 const isLinux = navigator.userAgent.includes("Linux");
@@ -62,25 +58,25 @@ function onWindowToggle(usage: UsageWindow, visible: boolean) {
         :disabled="!settings"
         @change="setOverlay(checked($event))"
       />
-      <span>Mostrar overlay</span>
+      <span>{{ t("overlay.show") }}</span>
     </label>
 
     <template v-if="settings && prefs">
       <div class="grid">
         <label class="field">
-          <span>Posição</span>
+          <span>{{ t("overlay.position") }}</span>
           <select :value="position" @change="onPosition">
-            <option v-for="anchor in anchorOptions" :key="anchor" :value="anchor">
-              {{ ANCHOR_LABELS[anchor] }}
+            <option v-for="anchor in ANCHORS" :key="anchor" :value="anchor">
+              {{ anchorLabel(anchor) }}
             </option>
             <option v-if="settings.overlayPosition" :value="CUSTOM" disabled>
-              Personalizada (arrastada)
+              {{ t("overlay.custom") }}
             </option>
           </select>
         </label>
 
         <label class="field">
-          <span>Opacidade do fundo: {{ opacity }}%</span>
+          <span>{{ t("overlay.opacity", { value: opacity }) }}</span>
           <input
             v-model.number="opacity"
             type="range"
@@ -98,23 +94,23 @@ function onWindowToggle(usage: UsageWindow, visible: boolean) {
           :checked="prefs.locked"
           @change="changeOverlay({ locked: checked($event) })"
         />
-        <span>Travar posição (impede arrastar o overlay)</span>
+        <span>{{ t("overlay.lock") }}</span>
       </label>
 
       <fieldset>
-        <legend>Informações exibidas</legend>
-        <label v-for="field in FIELDS" :key="field.key" class="row">
+        <legend>{{ t("overlay.fieldsLegend") }}</legend>
+        <label v-for="field in FIELDS" :key="field" class="row">
           <input
             type="checkbox"
-            :checked="prefs[field.key]"
-            @change="changeOverlay({ [field.key]: checked($event) })"
+            :checked="prefs[field]"
+            @change="changeOverlay({ [field]: checked($event) })"
           />
-          <span>{{ field.label }}</span>
+          <span>{{ t(`overlay.fields.${field}`) }}</span>
         </label>
       </fieldset>
 
       <fieldset v-if="windows.length">
-        <legend>Janelas exibidas</legend>
+        <legend>{{ t("overlay.windowsLegend") }}</legend>
         <label v-for="usage in windows" :key="windowKey(usage)" class="row">
           <input
             type="checkbox"
@@ -132,11 +128,10 @@ function onWindowToggle(usage: UsageWindow, visible: boolean) {
             :checked="settings.useXwayland"
             @change="setXwayland(checked($event))"
           />
-          <span>Usar XWayland</span>
+          <span>{{ t("overlay.xwayland") }}</span>
         </label>
         <p class="hint">
-          No GNOME em Wayland, posição, trava e "sempre no topo" só funcionam via XWayland. Vale
-          depois de reiniciar o app.
+          {{ t("overlay.xwaylandHint") }}
         </p>
       </div>
     </template>

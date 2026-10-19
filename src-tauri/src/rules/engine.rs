@@ -1,21 +1,24 @@
-//! Rule evaluation. Pure: all time and state come in as arguments.
+//! Rule evaluation. Pure: time, state and language all come in as arguments.
 
 use chrono::{DateTime, TimeDelta, Utc};
 
 use super::model::{Alert, Observation, Rule, RuleKind, RuleState};
 use crate::domain::{ProviderId, UsageWindow, WindowKind};
+use crate::i18n::{Key, Language, fill};
 
 /// Reset times closer than this belong to the same cycle. The API adds sub-second
 /// jitter to `resets_at` on every response, while real cycles are hours apart.
 const CYCLE_TOLERANCE: TimeDelta = TimeDelta::minutes(10);
 
-/// Evaluates enabled rules against freshly fetched windows and returns the alerts to send.
-/// Interval and before-reset rules are only as precise as the polling interval.
+/// Evaluates enabled rules against freshly fetched windows and returns the alerts to send,
+/// written in `language`. Interval and before-reset rules are only as precise as the
+/// polling interval.
 pub fn evaluate(
     rules: &[Rule],
     windows: &[UsageWindow],
     state: &mut RuleState,
     now: DateTime<Utc>,
+    language: Language,
 ) -> Vec<Alert> {
     let mut alerts = Vec::new();
 
@@ -35,13 +38,14 @@ pub fn evaluate(
             } => {
                 for usage in matching(windows, provider, window) {
                     if crossed_threshold(&rule.id, usage, percent, state) {
-                        alerts.push(alert(
-                            format!("{}: {:.0}%", usage.label(), usage.utilization),
-                            format!(
-                                "Atingiu o limiar de {percent}%.{}",
-                                reset_suffix(usage, now)
-                            ),
-                        ));
+                        let body = fill(
+                            language.text(Key::ThresholdBody),
+                            &[
+                                ("percent", &percent.to_string()),
+                                ("reset", &reset_suffix(usage, now, language)),
+                            ],
+                        );
+                        alerts.push(alert(title_with_usage(usage, language), body));
                     }
                 }
             }
@@ -52,26 +56,38 @@ pub fn evaluate(
             } => {
                 for usage in matching(windows, provider, window) {
                     if let Some(remaining) = reset_is_near(&rule.id, usage, minutes, state, now) {
-                        alerts.push(alert(
-                            format!(
-                                "{} reinicia em {}",
-                                usage.label(),
-                                format_duration(remaining)
-                            ),
-                            format!("Uso atual: {:.0}%.", usage.utilization),
-                        ));
+                        let title = fill(
+                            language.text(Key::ResetsInTitle),
+                            &[
+                                ("window", &usage.label(language)),
+                                ("duration", &format_duration(remaining, language)),
+                            ],
+                        );
+                        let body = fill(
+                            language.text(Key::CurrentUsage),
+                            &[("percent", &format!("{:.0}", usage.utilization))],
+                        );
+                        alerts.push(alert(title, body));
                     }
                 }
             }
             RuleKind::Interval { minutes } => {
                 if interval_due(&rule.id, minutes, state, now) {
-                    alerts.push(alert("Resumo de uso".into(), summary(windows, now)));
+                    alerts.push(alert(
+                        language.text(Key::SummaryTitle).into(),
+                        summary(windows, now, language),
+                    ));
                 }
             }
         }
     }
 
     alerts
+}
+
+/// E.g. "Claude · Session (5h): 85%".
+fn title_with_usage(usage: &UsageWindow, language: Language) -> String {
+    format!("{}: {:.0}%", usage.label(language), usage.utilization)
 }
 
 fn matching(
@@ -173,37 +189,52 @@ fn interval_due(rule_id: &str, minutes: u32, state: &mut RuleState, now: DateTim
     true
 }
 
-fn summary(windows: &[UsageWindow], now: DateTime<Utc>) -> String {
+fn summary(windows: &[UsageWindow], now: DateTime<Utc>, language: Language) -> String {
     if windows.is_empty() {
-        return "Nenhum dado de uso disponível no momento.".into();
+        return language.text(Key::SummaryEmpty).into();
     }
     windows
         .iter()
         .map(|usage| {
-            let reset = usage
-                .resets_at
-                .filter(|&resets_at| resets_at > now)
-                .map(|resets_at| format!(" (reinicia em {})", format_duration(resets_at - now)))
+            let reset = time_left(usage, now)
+                .map(|left| {
+                    fill(
+                        language.text(Key::SummaryReset),
+                        &[("duration", &format_duration(left, language))],
+                    )
+                })
                 .unwrap_or_default();
-            format!("{}: {:.0}%{reset}", usage.label(), usage.utilization)
+            format!("{}{reset}", title_with_usage(usage, language))
         })
         .collect::<Vec<_>>()
         .join("\n")
 }
 
-fn reset_suffix(usage: &UsageWindow, now: DateTime<Utc>) -> String {
-    usage
-        .resets_at
-        .filter(|&resets_at| resets_at > now)
-        .map(|resets_at| format!(" Reinicia em {}.", format_duration(resets_at - now)))
+fn reset_suffix(usage: &UsageWindow, now: DateTime<Utc>, language: Language) -> String {
+    time_left(usage, now)
+        .map(|left| {
+            fill(
+                language.text(Key::ResetsInSentence),
+                &[("duration", &format_duration(left, language))],
+            )
+        })
         .unwrap_or_default()
 }
 
-/// Compact duration such as "3d 4h", "2h 10min" or "8min".
-fn format_duration(duration: TimeDelta) -> String {
+/// Time until the window resets, if the reset is known and still ahead.
+fn time_left(usage: &UsageWindow, now: DateTime<Utc>) -> Option<TimeDelta> {
+    usage
+        .resets_at
+        .filter(|&resets_at| resets_at > now)
+        .map(|resets_at| resets_at - now)
+}
+
+/// Compact duration such as "3d 4h", "2h 10min" or "8min" (the units read the same
+/// in both languages).
+fn format_duration(duration: TimeDelta, language: Language) -> String {
     let total = duration.num_minutes();
     if total < 1 {
-        return "menos de 1 min".into();
+        return language.text(Key::LessThanOneMinute).into();
     }
     let (days, hours, minutes) = (total / (24 * 60), total % (24 * 60) / 60, total % 60);
     match (days, hours, minutes) {
@@ -271,7 +302,14 @@ mod tests {
         state: &mut RuleState,
         now: DateTime<Utc>,
     ) -> usize {
-        evaluate(std::slice::from_ref(rule), windows, state, now).len()
+        evaluate(
+            std::slice::from_ref(rule),
+            windows,
+            state,
+            now,
+            Language::En,
+        )
+        .len()
     }
 
     #[test]
@@ -289,11 +327,12 @@ mod tests {
             &[session(85.0, reset)],
             &mut state,
             minutes(3),
+            Language::En,
         );
 
         assert_eq!(alerts.len(), 1);
         assert_eq!(alerts[0].rule_id, "threshold");
-        assert_eq!(alerts[0].title, "Claude · Sessão (5h): 85%");
+        assert_eq!(alerts[0].title, "Claude · Session (5h): 85%");
     }
 
     #[test]
@@ -440,17 +479,29 @@ mod tests {
             session(85.0, minutes(300)),
             window(WindowKind::Rolling7d, 50.0, Some(week_reset)),
         ];
-        let alerts = evaluate(std::slice::from_ref(&rule), &first, &mut state, minutes(0));
+        let alerts = evaluate(
+            std::slice::from_ref(&rule),
+            &first,
+            &mut state,
+            minutes(0),
+            Language::En,
+        );
         assert_eq!(alerts.len(), 1);
-        assert!(alerts[0].title.contains("Sessão"));
+        assert!(alerts[0].title.contains("Session"));
 
         let second = [
             session(90.0, minutes(300)),
             window(WindowKind::Rolling7d, 82.0, Some(week_reset)),
         ];
-        let alerts = evaluate(std::slice::from_ref(&rule), &second, &mut state, minutes(3));
+        let alerts = evaluate(
+            std::slice::from_ref(&rule),
+            &second,
+            &mut state,
+            minutes(3),
+            Language::En,
+        );
         assert_eq!(alerts.len(), 1);
-        assert!(alerts[0].title.contains("Semanal"));
+        assert!(alerts[0].title.contains("Weekly"));
     }
 
     #[test]
@@ -518,9 +569,10 @@ mod tests {
             &[session(40.0, first_reset)],
             &mut state,
             minutes(6),
+            Language::En,
         );
         assert_eq!(alerts.len(), 1);
-        assert_eq!(alerts[0].title, "Claude · Sessão (5h) reinicia em 14min");
+        assert_eq!(alerts[0].title, "Claude · Session (5h) resets in 14min");
         assert_eq!(
             fire_count(&rule, &[session(45.0, first_reset)], &mut state, minutes(9)),
             0
@@ -572,11 +624,12 @@ mod tests {
             &windows,
             &mut state,
             minutes(10),
+            Language::En,
         );
         assert_eq!(alerts.len(), 1);
         assert_eq!(
             alerts[0].body,
-            "Claude · Sessão (5h): 42% (reinicia em 4h 50min)"
+            "Claude · Session (5h): 42% (resets in 4h 50min)"
         );
         assert_eq!(fire_count(&rule, &windows, &mut state, minutes(15)), 0);
         assert_eq!(fire_count(&rule, &windows, &mut state, minutes(20)), 1);
@@ -597,6 +650,7 @@ mod tests {
                 &[session(95.0, minutes(300))],
                 &mut state,
                 minutes(n),
+                Language::En,
             );
             assert!(alerts.is_empty());
         }
@@ -621,12 +675,41 @@ mod tests {
     }
 
     #[test]
+    fn alerts_follow_the_language() {
+        let rule = threshold(None, 80.0);
+        let mut state = RuleState::default();
+
+        let alerts = evaluate(
+            std::slice::from_ref(&rule),
+            &[session(85.0, minutes(130))],
+            &mut state,
+            minutes(0),
+            Language::Pt,
+        );
+
+        assert_eq!(alerts[0].title, "Claude · Sessão (5h): 85%");
+        assert_eq!(
+            alerts[0].body,
+            "Atingiu o limiar de 80%. Reinicia em 2h 10min."
+        );
+    }
+
+    #[test]
     fn formats_durations() {
-        assert_eq!(format_duration(TimeDelta::seconds(30)), "menos de 1 min");
-        assert_eq!(format_duration(TimeDelta::minutes(8)), "8min");
-        assert_eq!(format_duration(TimeDelta::minutes(120)), "2h");
-        assert_eq!(format_duration(TimeDelta::minutes(130)), "2h 10min");
-        assert_eq!(format_duration(TimeDelta::days(3)), "3d");
-        assert_eq!(format_duration(TimeDelta::minutes(3 * 1440 + 250)), "3d 4h");
+        assert_eq!(
+            format_duration(TimeDelta::seconds(30), Language::En),
+            "less than 1 min"
+        );
+        assert_eq!(format_duration(TimeDelta::minutes(8), Language::En), "8min");
+        assert_eq!(format_duration(TimeDelta::minutes(120), Language::En), "2h");
+        assert_eq!(
+            format_duration(TimeDelta::minutes(130), Language::En),
+            "2h 10min"
+        );
+        assert_eq!(format_duration(TimeDelta::days(3), Language::En), "3d");
+        assert_eq!(
+            format_duration(TimeDelta::minutes(3 * 1440 + 250), Language::En),
+            "3d 4h"
+        );
     }
 }

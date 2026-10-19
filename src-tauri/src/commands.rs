@@ -1,13 +1,12 @@
-use tauri::{AppHandle, Runtime, State};
+use tauri::{AppHandle, Emitter, Runtime, State};
 use uuid::Uuid;
 
 use crate::domain::UsageSnapshot;
+use crate::i18n::{self, Key, LANGUAGE_CHANGED, LanguageInfo, LanguagePref, t};
 use crate::rules::{Alert, Rule, RuleInput};
 use crate::settings::{Anchor, OverlayPrefs, Settings, validate_poll_interval};
 use crate::state::AppState;
 use crate::{overlay, store};
-
-const RULE_NOT_FOUND: &str = "Regra não encontrada.";
 
 #[tauri::command]
 pub fn get_snapshot(state: State<'_, AppState>) -> UsageSnapshot {
@@ -38,6 +37,28 @@ pub fn update_settings<R: Runtime>(
     // Restarts the wait so the new interval applies now (this also polls once).
     state.poller.refresh_now();
     Ok(saved)
+}
+
+#[tauri::command]
+pub fn get_language(state: State<'_, AppState>) -> LanguageInfo {
+    i18n::info(state.settings().language)
+}
+
+/// Switches the language of the UI, notifications, errors and tray right away.
+#[tauri::command]
+pub fn set_language<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, AppState>,
+    language: LanguagePref,
+) -> Result<LanguageInfo, String> {
+    store::change_settings(&app, |settings| settings.language = language)?;
+    let info = i18n::apply(language);
+    #[cfg(desktop)]
+    crate::tray::relabel(&app);
+    let _ = app.emit(LANGUAGE_CHANGED, &info);
+    // Polls again so provider error messages are rewritten in the new language.
+    state.poller.refresh_now();
+    Ok(info)
 }
 
 #[tauri::command]
@@ -126,7 +147,7 @@ pub fn update_rule<R: Runtime>(
     let slot = rules
         .iter_mut()
         .find(|existing| existing.id == rule.id)
-        .ok_or(RULE_NOT_FOUND)?;
+        .ok_or(t(Key::RuleNotFound))?;
     *slot = rule.clone();
     store::save_rules(&app, &rules)?;
     book.rules = rules;
@@ -144,7 +165,7 @@ pub fn delete_rule<R: Runtime>(
 ) -> Result<(), String> {
     let mut book = state.rules();
     if !book.rules.iter().any(|rule| rule.id == id) {
-        return Err(RULE_NOT_FOUND.into());
+        return Err(t(Key::RuleNotFound).into());
     }
     let rules: Vec<Rule> = book
         .rules

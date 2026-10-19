@@ -2,6 +2,8 @@ use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
+use crate::i18n::{Key, LanguagePref, fill, t};
+
 pub const SETTINGS_CHANGED: &str = "settings://changed";
 
 const MIN_POLL_INTERVAL_MINUTES: u32 = 1;
@@ -19,6 +21,7 @@ pub struct Settings {
     /// Linux only: run through XWayland, where positioning and always-on-top
     /// work. Read at startup, so a change applies after a restart.
     pub use_xwayland: bool,
+    pub language: LanguagePref,
 }
 
 impl Default for Settings {
@@ -29,6 +32,7 @@ impl Default for Settings {
             overlay: OverlayPrefs::default(),
             overlay_position: None,
             use_xwayland: false,
+            language: LanguagePref::Auto,
         }
     }
 }
@@ -70,7 +74,7 @@ pub struct OverlayPrefs {
 impl OverlayPrefs {
     pub fn validate(&self) -> Result<(), String> {
         if self.opacity > 100 {
-            return Err("A opacidade deve estar entre 0 e 100%.".into());
+            return Err(t(Key::OpacityRange).into());
         }
         Ok(())
     }
@@ -93,8 +97,9 @@ impl Default for OverlayPrefs {
 
 pub fn validate_poll_interval(minutes: u32) -> Result<(), String> {
     if minutes < MIN_POLL_INTERVAL_MINUTES {
-        return Err(format!(
-            "O intervalo de consulta deve ser de pelo menos {MIN_POLL_INTERVAL_MINUTES} minuto."
+        return Err(fill(
+            t(Key::PollIntervalMinimum),
+            &[("minutes", &MIN_POLL_INTERVAL_MINUTES.to_string())],
         ));
     }
     Ok(())
@@ -124,6 +129,7 @@ mod tests {
         assert_eq!(settings.overlay, OverlayPrefs::default());
         assert_eq!(settings.overlay_position, None);
         assert!(!settings.use_xwayland);
+        assert_eq!(settings.language, LanguagePref::Auto);
     }
 
     #[test]

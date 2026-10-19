@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ProviderError;
+use crate::i18n::{Key, Language};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -41,11 +42,11 @@ impl WindowKind {
         }
     }
 
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Rolling5h => "Sessão (5h)",
-            Self::Rolling7d => "Semanal (7 dias)",
-        }
+    pub fn label(self, language: Language) -> &'static str {
+        language.text(match self {
+            Self::Rolling5h => Key::Session5h,
+            Self::Rolling7d => Key::Weekly7d,
+        })
     }
 }
 
@@ -66,8 +67,8 @@ impl UsageWindow {
         format!("{}:{}", self.provider.as_str(), self.kind.as_str())
     }
 
-    pub fn label(&self) -> String {
-        format!("{} · {}", self.provider.label(), self.kind.label())
+    pub fn label(&self, language: Language) -> String {
+        format!("{} · {}", self.provider.label(), self.kind.label(language))
     }
 }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UsageBar from "./UsageBar.vue";
+import { t } from "../i18n";
 import { formatTime, providerLabel } from "../lib/format";
 import type { ProviderStatus } from "../lib/types";
 
@@ -15,7 +16,7 @@ defineProps<{
 
     <p v-if="status.error" class="error" role="alert">{{ status.error.message }}</p>
 
-    <p v-if="!status.windows.length && !status.error" class="muted">Carregando…</p>
+    <p v-if="!status.windows.length && !status.error" class="muted">{{ t("status.loading") }}</p>
 
     <UsageBar
       v-for="usage in status.windows"
@@ -26,7 +27,7 @@ defineProps<{
     />
 
     <p v-if="status.error && status.lastSuccessAt" class="muted note">
-      Valores da última leitura bem-sucedida, às {{ formatTime(status.lastSuccessAt) }}.
+      {{ t("status.stale", { time: formatTime(status.lastSuccessAt) }) }}
     </p>
   </section>
 </template>

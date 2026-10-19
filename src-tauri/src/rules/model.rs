@@ -4,6 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{ProviderId, WindowKind};
+use crate::i18n::{Key, t};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -48,10 +49,10 @@ impl RuleKind {
         match *self {
             // Also rejects NaN.
             Self::Threshold { percent, .. } if !(percent > 0.0 && percent <= 100.0) => {
-                Err("O limiar deve ser maior que 0% e no máximo 100%.".into())
+                Err(t(Key::ThresholdRange).into())
             }
             Self::Interval { minutes: 0 } | Self::BeforeReset { minutes: 0, .. } => {
-                Err("O número de minutos deve ser pelo menos 1.".into())
+                Err(t(Key::MinutesMinimum).into())
             }
             _ => Ok(()),
         }

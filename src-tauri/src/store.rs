@@ -7,6 +7,7 @@ use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 use tauri_plugin_store::StoreExt;
 
+use crate::i18n::{Key, fill, t};
 use crate::rules::{FiredCycles, Rule};
 use crate::settings::{SETTINGS_CHANGED, Settings};
 use crate::state::AppState;
@@ -107,8 +108,12 @@ fn save<R: Runtime, T: Serialize + ?Sized>(
     key: &str,
     value: &T,
 ) -> Result<(), String> {
-    let failed =
-        |error: &dyn std::fmt::Display| format!("Não foi possível salvar ({key}): {error}");
+    let failed = |error: &dyn std::fmt::Display| {
+        fill(
+            t(Key::SaveFailed),
+            &[("key", key), ("error", &error.to_string())],
+        )
+    };
 
     let value = serde_json::to_value(value).map_err(|error| failed(&error))?;
     let store = app.store(STORE_FILE).map_err(|error| failed(&error))?;

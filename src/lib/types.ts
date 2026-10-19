@@ -84,6 +84,17 @@ export interface OverlayPrefs {
   hiddenWindows: string[];
 }
 
+export type Language = "en" | "pt";
+
+/** `auto` follows the system language. */
+export type LanguagePref = "auto" | Language;
+
+export interface LanguageInfo {
+  language: Language;
+  /** BCP 47 tag for formatting dates and numbers. */
+  locale: string;
+}
+
 export interface Settings {
   pollIntervalMinutes: number;
   overlayEnabled: boolean;
@@ -91,6 +102,7 @@ export interface Settings {
   /** Physical position saved after dragging; `null` follows `overlay.anchor`. */
   overlayPosition: { x: number; y: number } | null;
   useXwayland: boolean;
+  language: LanguagePref;
 }
 
 export interface Alert {

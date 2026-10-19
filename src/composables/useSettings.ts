@@ -2,6 +2,7 @@ import { onMounted, onUnmounted, ref } from "vue";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import {
   getSettings,
+  setLanguage,
   setOverlayAnchor,
   setOverlayVisible,
   setUseXwayland,
@@ -9,7 +10,7 @@ import {
   updateSettings,
 } from "../lib/api";
 import { onSettingsChanged } from "../lib/events";
-import type { Anchor, OverlayPrefs, Settings } from "../lib/types";
+import type { Anchor, LanguagePref, OverlayPrefs, Settings } from "../lib/types";
 import { useAttempt } from "./useAttempt";
 
 export function useSettings() {
@@ -53,5 +54,20 @@ export function useSettings() {
       settings.value = await setUseXwayland(enabled);
     });
 
-  return { settings, error, save, setOverlay, changeOverlay, setAnchor, setXwayland };
+  /** The new settings and texts arrive through the change events. */
+  const changeLanguage = (language: LanguagePref) =>
+    attempt(async () => {
+      await setLanguage(language);
+    });
+
+  return {
+    settings,
+    error,
+    save,
+    setOverlay,
+    changeOverlay,
+    setAnchor,
+    setXwayland,
+    changeLanguage,
+  };
 }

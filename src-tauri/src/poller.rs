@@ -8,7 +8,7 @@ use crate::domain::UsageWindow;
 use crate::providers::UsageProvider;
 use crate::rules::{RuleBook, engine};
 use crate::state::AppState;
-use crate::{alerts, store};
+use crate::{alerts, i18n, store};
 
 pub const USAGE_UPDATED: &str = "usage://updated";
 
@@ -75,7 +75,7 @@ async fn poll_once<R: Runtime>(app: &AppHandle<R>, providers: &[Arc<dyn UsagePro
         let mut book = state.rules();
         let RuleBook { rules, state } = &mut *book;
         let before = state.fired.clone();
-        let alerts = engine::evaluate(rules, &fresh, state, now);
+        let alerts = engine::evaluate(rules, &fresh, state, now, i18n::current());
         let changed = (state.fired != before).then(|| state.fired.clone());
         (alerts, changed)
     };

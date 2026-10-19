@@ -4,6 +4,7 @@ mod cli;
 mod commands;
 mod domain;
 mod error;
+mod i18n;
 mod overlay;
 mod poller;
 mod providers;
@@ -52,6 +53,7 @@ pub fn run() {
             )?)];
 
             let persisted = store::load(app.handle());
+            i18n::apply(persisted.settings.language);
             let rule_book = RuleBook {
                 rules: persisted.rules,
                 state: RuleState::with_fired(persisted.fired),
@@ -93,6 +95,8 @@ pub fn run() {
             commands::create_rule,
             commands::update_rule,
             commands::delete_rule,
+            commands::get_language,
+            commands::set_language,
             commands::set_overlay_visible,
             commands::update_overlay_prefs,
             commands::set_overlay_anchor,

@@ -16,6 +16,7 @@ use serde_json::Value;
 use super::UsageProvider;
 use crate::domain::{ProviderId, UsageWindow, WindowKind};
 use crate::error::{ErrorCode, ProviderError};
+use crate::i18n::{Key, fill, t};
 
 const USAGE_URL: &str = "https://api.anthropic.com/api/oauth/usage";
 const BETA_HEADER: &str = "oauth-2025-04-20";
@@ -27,8 +28,6 @@ const WINDOW_KEYS: [(&str, WindowKind); 2] = [
     ("five_hour", WindowKind::Rolling5h),
     ("seven_day", WindowKind::Rolling7d),
 ];
-
-const RENEW_HINT: &str = "Abra o Claude Code para renová-lo.";
 
 pub struct ClaudeOAuthProvider {
     credentials_path: PathBuf,
@@ -74,27 +73,27 @@ impl UsageProvider for ClaudeOAuthProvider {
 
         match response.status() {
             StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                let status = response.status().as_u16().to_string();
                 return Err(ProviderError::new(
                     ErrorCode::Unauthorized,
-                    format!(
-                        "Token do Claude recusado (HTTP {}). {RENEW_HINT}",
-                        response.status().as_u16()
+                    fill(
+                        t(Key::TokenRefused),
+                        &[("status", &status), ("hint", t(Key::RenewHint))],
                     ),
                 ));
             }
             StatusCode::TOO_MANY_REQUESTS => {
                 return Err(ProviderError::new(
                     ErrorCode::RateLimited,
-                    "Limite de consultas ao endpoint de uso atingido (HTTP 429). \
-                     Nova tentativa no próximo ciclo.",
+                    t(Key::RateLimited),
                 ));
             }
             status if !status.is_success() => {
                 return Err(ProviderError::new(
                     ErrorCode::Http,
-                    format!(
-                        "Resposta inesperada do servidor (HTTP {}).",
-                        status.as_u16()
+                    fill(
+                        t(Key::UnexpectedStatus),
+                        &[("status", &status.as_u16().to_string())],
                     ),
                 ));
             }
@@ -132,7 +131,7 @@ impl Credentials {
         match self.expires_at {
             Some(expires_at) if expires_at <= now => Err(ProviderError::new(
                 ErrorCode::TokenExpired,
-                format!("Token do Claude expirado. {RENEW_HINT}"),
+                fill(t(Key::TokenExpired), &[("hint", t(Key::RenewHint))]),
             )),
             _ => Ok(()),
         }
@@ -144,16 +143,19 @@ fn read_credentials(path: &Path) -> Result<Credentials, ProviderError> {
     let raw = std::fs::read_to_string(path).map_err(|error| match error.kind() {
         io::ErrorKind::NotFound => ProviderError::new(
             ErrorCode::CredentialsMissing,
-            format!(
-                "Credenciais do Claude Code não encontradas em {}. Faça login no Claude Code.",
-                path.display()
+            fill(
+                t(Key::CredentialsMissing),
+                &[("path", &path.display().to_string())],
             ),
         ),
         kind => ProviderError::new(
             ErrorCode::CredentialsInvalid,
-            format!(
-                "Não foi possível ler as credenciais em {} ({kind}).",
-                path.display()
+            fill(
+                t(Key::CredentialsUnreadable),
+                &[
+                    ("path", &path.display().to_string()),
+                    ("error", &kind.to_string()),
+                ],
             ),
         ),
     })?;
@@ -163,12 +165,7 @@ fn read_credentials(path: &Path) -> Result<Credentials, ProviderError> {
 /// Parses the credentials file. Error messages never include file contents,
 /// since parser messages could echo a token value.
 fn parse_credentials(raw: &str) -> Result<Credentials, ProviderError> {
-    let invalid = || {
-        ProviderError::new(
-            ErrorCode::CredentialsInvalid,
-            "Arquivo de credenciais do Claude Code em formato inesperado.",
-        )
-    };
+    let invalid = || ProviderError::new(ErrorCode::CredentialsInvalid, t(Key::CredentialsInvalid));
 
     let root: Value = serde_json::from_str(raw).map_err(|_| invalid())?;
     let oauth = root.get("claudeAiOauth").ok_or_else(invalid)?;
@@ -189,16 +186,16 @@ fn parse_credentials(raw: &str) -> Result<Credentials, ProviderError> {
 }
 
 fn parse_usage(body: &str) -> Result<Vec<UsageWindow>, ProviderError> {
-    let parse_error = |detail: &str| {
+    let parse_error = |detail: Key| {
         ProviderError::new(
             ErrorCode::Parse,
-            format!("Resposta do endpoint de uso em formato inesperado: {detail}."),
+            fill(t(Key::UsageFormat), &[("detail", t(detail))]),
         )
     };
 
-    let root: Value = serde_json::from_str(body).map_err(|_| parse_error("JSON inválido"))?;
+    let root: Value = serde_json::from_str(body).map_err(|_| parse_error(Key::UsageInvalidJson))?;
     if !root.is_object() {
-        return Err(parse_error("o corpo não é um objeto"));
+        return Err(parse_error(Key::UsageNotObject));
     }
 
     let windows: Vec<UsageWindow> = WINDOW_KEYS
@@ -207,7 +204,7 @@ fn parse_usage(body: &str) -> Result<Vec<UsageWindow>, ProviderError> {
         .collect();
 
     if windows.is_empty() {
-        return Err(parse_error("nenhuma janela de uso reconhecida"));
+        return Err(parse_error(Key::UsageNoWindows));
     }
     Ok(windows)
 }
@@ -232,9 +229,9 @@ fn parse_window(value: &Value, kind: WindowKind) -> Option<UsageWindow> {
 
 fn network_error(error: reqwest::Error) -> ProviderError {
     let message = if error.is_timeout() {
-        "Tempo esgotado ao consultar o uso do Claude.".to_owned()
+        t(Key::NetworkTimeout).to_owned()
     } else {
-        format!("Falha de rede ao consultar o uso do Claude: {error}")
+        fill(t(Key::NetworkFailure), &[("error", &error.to_string())])
     };
     ProviderError::new(ErrorCode::Network, message)
 }
