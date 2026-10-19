@@ -1,104 +1,110 @@
 <p align="center">
-  <img src="src-tauri/icons/128x128.png" alt="Ícone do AI Usage" width="96" height="96">
+  <img src="src-tauri/icons/128x128.png" alt="AI Usage icon" width="96" height="96">
 </p>
 
 <h1 align="center">AI Usage</h1>
 
 <p align="center">
-  Monitor de desktop para os limites de uso do Claude, com avisos por notificação e um overlay sempre visível.
+  Desktop monitor for your Claude usage limits, with notifications and an always-visible overlay.
 </p>
 
 ---
 
-O AI Usage roda em segundo plano, no tray do sistema. Ele consulta periodicamente quanto dos seus limites do Claude você já usou e avisa conforme regras que você define. Os limites acompanhados são a sessão de 5 horas e a janela semanal. Os avisos podem vir como notificação do sistema, numa janela compacta de overlay ou nos dois.
+AI Usage runs in the background from the system tray. It periodically checks how much of your Claude limits you have used and alerts you according to rules you define. It tracks the 5-hour session and the weekly window. Alerts can arrive as system notifications, in a compact overlay window, or both. The app is available in **English** and **Portuguese**.
 
-> **Status:** o provider do **Claude** está completo. O provider do **Gemini/Antigravity** e a **inicialização automática com o sistema** ainda estão em desenvolvimento (ver [Roadmap](#roadmap)).
+> **Status:** the **Claude** provider is complete. The **Gemini/Antigravity** provider and **launch at login** are still in progress (see the [Roadmap](#roadmap)).
 
-## Sumário
+## Contents
 
-- [Funcionalidades](#funcionalidades)
-- [Como funciona](#como-funciona)
-- [Requisitos](#requisitos)
-- [Instalação e execução](#instalação-e-execução)
-- [Uso](#uso)
-- [Linux: GNOME, Wayland e tray](#linux-gnome-wayland-e-tray)
-- [Dados e privacidade](#dados-e-privacidade)
-- [Arquitetura](#arquitetura)
-- [Desenvolvimento](#desenvolvimento)
-- [Solução de problemas](#solução-de-problemas)
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Linux: GNOME, Wayland and the tray](#linux-gnome-wayland-and-the-tray)
+- [Data and privacy](#data-and-privacy)
+- [Architecture](#architecture)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
 - [Roadmap](#roadmap)
 
-## Funcionalidades
+## Features
 
-- **Status do uso:** barra de progresso, percentual usado e tempo até o reset de cada janela de limite (sessão de 5h e semanal).
-- **Regras de aviso configuráveis:**
-  - **Limiar de uso:** avisa quando o uso de uma janela passa de X%, no máximo uma vez por ciclo de reset.
-  - **Resumo periódico:** um resumo do uso a cada N minutos.
-  - **Antes do reset:** avisa N minutos antes de uma janela reiniciar.
-- **Canais por regra:** notificação do sistema, overlay ou ambos.
-- **Overlay compacto:** janela sem bordas, transparente e sempre no topo, com os percentuais.
-  - Posição padrão em seis pontos da tela, posição livre por arraste e trava de posição.
-  - Opacidade do fundo ajustável.
-  - Escolha do que exibir: nome do provider, nome da janela, percentual e tempo até o reset, além de cada janela individualmente.
-- **Tray:** abrir a janela, ligar ou desligar o overlay, forçar atualização e sair.
-- **Linha de comando:** `--toggle` e `--overlay`, para controlar o overlay por um atalho de teclado.
-- **Instância única:** abrir o app de novo apenas foca a instância que já está rodando, sem duplicar o tray nem as notificações.
+- **Usage status:** progress bar, percentage used and time until reset for each limit window (5-hour session and weekly).
+- **Configurable alert rules:**
+  - **Usage threshold:** alerts when a window goes past X%, at most once per reset cycle.
+  - **Periodic summary:** a usage summary every N minutes.
+  - **Before reset:** alerts N minutes before a window resets.
+- **Channels per rule:** system notification, overlay or both.
+- **Compact overlay:** borderless, transparent, always-on-top window with the percentages.
+  - Six preset positions, free positioning by dragging, and a position lock.
+  - Adjustable background opacity.
+  - Choice of what to show: provider name, window name, percentage and time until reset, plus each window individually.
+- **Tray:** open the window, turn the overlay on or off, refresh now and quit.
+- **Command line:** `--toggle` and `--overlay`, to control the overlay from a keyboard shortcut.
+- **English and Portuguese:** follows the system language, with a manual choice in the settings.
+- **Single instance:** opening the app again just focuses the running instance, with no duplicate tray icon or notifications.
 
-## Como funciona
+## How it works
 
-### De onde vêm os números
+### Where the numbers come from
 
-O app não calcula o limite: quem calcula são os servidores da Anthropic. A cada consulta, o app faz o seguinte:
+The app does not compute the limits; Anthropic's servers do. On each check, the app:
 
-1. Lê o token de login do Claude Code em `~/.claude/.credentials.json`.
-2. Chama `GET https://api.anthropic.com/api/oauth/usage`, o mesmo endpoint usado pelo comando `/usage` do Claude Code.
-3. Recebe, para cada janela de limite, o percentual usado e o momento do reset:
+1. Reads Claude Code's login token from `~/.claude/.credentials.json`.
+2. Calls `GET https://api.anthropic.com/api/oauth/usage`, the same endpoint used by Claude Code's `/usage` command.
+3. Receives, for each limit window, the percentage used and the reset time:
 
    ```json
    "five_hour": { "utilization": 43.0, "resets_at": "2026-10-19T01:00:00.42+00:00" },
    "seven_day": { "utilization": 40.0, "resets_at": "2026-10-22T22:00:00.42+00:00" }
    ```
 
-   - **`utilization`** é o percentual já usado, de 0 a 100. O que resta é 100 menos esse valor. A API informa apenas percentuais, não mensagens nem tokens.
-   - **`resets_at`** é quando a janela zera. O tempo restante é calculado na interface (`resets_at − agora`) e atualizado a cada 30 segundos.
+   - **`utilization`** is the percentage already used, from 0 to 100. What is left is 100 minus that value. The API only reports percentages, not messages or tokens.
+   - **`resets_at`** is when the window resets. The time left is computed by the UI (`resets_at − now`) and refreshed every 30 seconds.
 
-O uso é contado por **conta**: mensagens no claude.ai, no app de desktop e no Claude Code entram todas no mesmo percentual.
+Usage is counted per **account**: messages on claude.ai, in the desktop app and in Claude Code all add to the same percentage.
 
-> O endpoint não é documentado publicamente. Por isso, o leitor tolera mudanças: ignora campos desconhecidos e valores nulos e, se o formato mudar, mostra um erro claro em vez de travar.
+> The endpoint is not publicly documented. The parser is therefore tolerant: it ignores unknown fields and null values, and if the format changes, it shows a clear error instead of crashing.
 
 ### Token
 
-- O arquivo de credenciais é **relido a cada consulta** e **nunca escrito**. Quando o Claude Code renova o token, o app passa a usar o novo automaticamente.
-- Se o token já expirou (`expiresAt`), o app nem faz a requisição: mostra "Token do Claude expirado. Abra o Claude Code para renová-lo."
-- O token nunca é registrado em log, exibido ou enviado a outro destino.
+- The credentials file is **read on every check** and **never written**. When Claude Code renews the token, the app picks up the new one automatically.
+- If the token has already expired (`expiresAt`), the app skips the request and shows "Claude token expired. Open Claude Code to renew it."
+- The token is never logged, displayed or sent anywhere else.
 
-### Consulta periódica
+### Periodic check
 
-A consulta roda no núcleo em Rust, independente de a janela estar aberta. O intervalo padrão é de 3 minutos, com mínimo de 1, e pode ser configurado. "Atualizar agora" (na janela ou no tray) força uma consulta imediata.
+Checks run in the Rust core, whether or not the window is open. The default interval is 3 minutes, with a minimum of 1, and it can be configured. "Refresh" (in the window or the tray) forces an immediate check.
 
-Se uma consulta falhar (rede, token expirado etc.), a tela mantém os últimos valores válidos, esmaecidos, ao lado da mensagem de erro.
+If a check fails (network, expired token, etc.), the screen keeps the last valid values, dimmed, next to the error message.
 
-### Regras
+### Rules
 
-- **Ciclo de reset.** Cada janela tem um ciclo identificado pelo seu `resets_at`. A API varia esse horário em cerca de 1 segundo a cada resposta, então horários a menos de 10 minutos de distância contam como o mesmo ciclo.
-- **Limiar.** Dispara quando o uso cruza o limite (`anterior < X ≤ atual`), no máximo uma vez por ciclo. A primeira leitura de um ciclo conta como cruzamento: se o app abrir com o uso já acima do limite, você é avisado.
-- **Persistência.** O ciclo em que cada regra disparou fica salvo. Reiniciar o app não repete avisos do ciclo atual.
-- **Edição.** Editar, ativar ou desativar uma regra a "rearma", e ela pode disparar de novo no ciclo atual.
-- **Antes do reset.** Ignora janelas com uso 0%, cujo reset não muda nada.
-- **Precisão.** As regras "resumo periódico" e "antes do reset" são avaliadas a cada consulta, então a precisão delas é igual ao intervalo de consulta.
+- **Reset cycle.** Each window has a cycle identified by its `resets_at`. The API shifts this time by about a second on every response, so reset times less than 10 minutes apart count as the same cycle.
+- **Threshold.** Fires when usage crosses the limit (`previous < X ≤ current`), at most once per cycle. The first reading of a cycle counts as a crossing: if the app starts with usage already above the limit, you are alerted.
+- **Persistence.** The cycle in which each rule fired is saved, so restarting the app does not repeat alerts from the current cycle.
+- **Editing.** Editing, enabling or disabling a rule re-arms it, so it may fire again in the current cycle.
+- **Before reset.** Windows at 0% usage are skipped, since their reset changes nothing.
+- **Precision.** "Periodic summary" and "before reset" rules are evaluated on each check, so they are as precise as the check interval.
 
-## Requisitos
+## Requirements
 
-| Requisito | Versão / observação |
+| Requirement | Version / notes |
 |---|---|
-| Sistema | Linux (testado no Fedora 44 com GNOME 50 em Wayland). Windows e Android estão planejados. |
-| [Claude Code](https://docs.claude.com/en/docs/claude-code) | Instalado e com login feito (cria `~/.claude/.credentials.json`) |
-| Rust | Estável, com suporte à edition 2024 (1.85 ou mais recente) |
-| Node.js | `^20.19` ou `>= 22.12` (exigência do Vite 8) |
-| pnpm | Gerenciador de pacotes do front |
-| Dependências de sistema do Tauri | Ver abaixo |
+| Operating system | Linux (tested on Fedora 44 with GNOME 50 on Wayland). Windows and Android are planned. |
+| [Claude Code](https://docs.claude.com/en/docs/claude-code) | Installed and logged in (this creates `~/.claude/.credentials.json`) |
 
-### Dependências de sistema (Linux)
+To build from source you also need:
+
+| Requirement | Version / notes |
+|---|---|
+| Rust | Stable, with edition 2024 support (1.85 or newer) |
+| Node.js | `^20.19` or `>= 22.12` (required by Vite 8) |
+| pnpm | Frontend package manager |
+| Tauri system dependencies | See below |
+
+### System dependencies (Linux)
 
 **Fedora:**
 
@@ -116,25 +122,39 @@ sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
   libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 ```
 
-A lista oficial e atualizada está nos [pré-requisitos do Tauri](https://v2.tauri.app/start/prerequisites/).
+The official, up-to-date list is in the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
-**Tray no GNOME (Fedora):** o GNOME não mostra ícones de tray sem uma extensão.
+**Tray on GNOME (Fedora):** GNOME does not show tray icons without an extension.
 
 ```sh
 sudo dnf install gnome-shell-extension-appindicator
 gnome-extensions enable appindicatorsupport@rgcjonas.gmail.com
 ```
 
-Depois disso, saia e entre de novo na sessão. O Ubuntu já vem com essa extensão ativa.
+Then log out and back in. Ubuntu ships with this extension enabled.
 
-### Principais bibliotecas
+### Main libraries
 
-| Camada | Bibliotecas |
+| Layer | Libraries |
 |---|---|
-| Núcleo (Rust) | `tauri` 2, `tauri-plugin-notification`, `tauri-plugin-store`, `tauri-plugin-single-instance`, `reqwest` (TLS via rustls), `tokio`, `chrono`, `serde`, `thiserror`, `uuid` |
-| Interface | Vue 3 (Composition API, `<script setup>`), TypeScript, Vite 8, `@tauri-apps/api` |
+| Core (Rust) | `tauri` 2, `tauri-plugin-notification`, `tauri-plugin-store`, `tauri-plugin-single-instance`, `reqwest` (rustls TLS), `tokio`, `chrono`, `serde`, `thiserror`, `uuid`, `sys-locale` |
+| UI | Vue 3 (Composition API, `<script setup>`), TypeScript, Vite 8, `@tauri-apps/api` |
 
-## Instalação e execução
+## Installation
+
+### From a release
+
+Download the package for your distribution from the [Releases](https://github.com/Wender13/ai_usage/releases) page:
+
+| Package | Install |
+|---|---|
+| `.rpm` (Fedora) | `sudo dnf install ./ai-usage-0.1.0-1.x86_64.rpm` |
+| `.deb` (Ubuntu 20.04+ / Debian 11+) | `sudo apt install ./ai-usage_0.1.0_amd64.deb` |
+| `.AppImage` (any distribution) | `chmod +x ai-usage_0.1.0_amd64.AppImage && ./ai-usage_0.1.0_amd64.AppImage` |
+
+The `.rpm` and `.deb` install the `ai_usage` command and a menu entry. The AppImage bundles its libraries and runs without installing. To verify a download, put `SHA256SUMS` next to it and run `sha256sum -c --ignore-missing SHA256SUMS`.
+
+### From source
 
 ```sh
 git clone git@github.com:Wender13/ai_usage.git
@@ -142,156 +162,157 @@ cd ai_usage
 pnpm install
 ```
 
-**Desenvolvimento** (recarrega o front e recompila o Rust ao salvar):
+**Development** (reloads the UI and rebuilds the Rust core on save):
 
 ```sh
 pnpm tauri dev
 ```
 
-**Build de produção** (gera os pacotes em `src-tauri/target/release/bundle/`):
+**Production build** (packages are written to `src-tauri/target/release/bundle/`):
 
 ```sh
 pnpm tauri build
 ```
 
-## Uso
+## Usage
 
-### Janela principal
+### Main window
 
-Fechar a janela apenas a esconde: o app continua no tray. Para sair, use **Sair** no menu do tray. A janela tem quatro áreas:
+Closing the window only hides it; the app keeps running in the tray. To exit, use **Quit** in the tray menu. The window has four areas:
 
-- **Status:** um card por provider, com cada janela de limite (percentual, barra e "reinicia em 2h 10min (22:00)"). A barra fica amarela a partir de 70% e vermelha a partir de 90%.
-- **Regras:** lista com descrição automática (ex.: "Ao atingir 80% em Claude · Sessão (5h)"), caixa para ativar ou desativar, **Editar** e **Excluir**. **Nova regra** abre o formulário.
-- **Configurações:** intervalo de consulta, em minutos.
-- **Overlay:** todas as opções do overlay, descritas abaixo.
+- **Status:** one card per provider, with each limit window (percentage, bar and "resets in 2h 10min (10:00 PM)"). The bar turns yellow from 70% and red from 90%.
+- **Rules:** a list with an automatic description (e.g. "When Claude · Session (5h) reaches 80%"), a checkbox to enable or disable, **Edit** and **Delete**. **New rule** opens the form.
+- **Settings:** check interval in minutes, and language.
+- **Overlay:** all overlay options, described below.
 
-### Criando regras
+### Creating rules
 
-No formulário, escolha:
+In the form, choose:
 
-| Campo | Opções |
+| Field | Options |
 |---|---|
-| Tipo | Limiar de uso · Resumo periódico · Antes do reset |
-| Provider | Qualquer · Claude |
-| Janela | Qualquer · Sessão (5h) · Semanal (7 dias) |
-| Limiar (%) / minutos | Depende do tipo |
-| Canal | Notificação · Overlay · Notificação e overlay |
+| Type | Usage threshold · Periodic summary · Before reset |
+| Provider | Any · Claude |
+| Window | Any · Session (5h) · Weekly (7 days) |
+| Threshold (%) / minutes | Depends on the type |
+| Channel | Notification · Overlay · Notification and overlay |
 
-Alguns exemplos:
+Some examples:
 
-- **Avisar quando a sessão passar de 80%:** Limiar de uso, Claude, Sessão (5h), 80%, Notificação.
-- **Lembrar de usar o que sobrou antes do reset semanal:** Antes do reset, Claude, Semanal, 120 minutos.
-- **Acompanhar o consumo durante o dia:** Resumo periódico, a cada 60 minutos.
+- **Alert when the session goes past 80%:** Usage threshold, Claude, Session (5h), 80%, Notification.
+- **Reminder to use what is left before the weekly reset:** Before reset, Claude, Weekly, 120 minutes.
+- **Follow consumption during the day:** Periodic summary, every 60 minutes.
 
-Com "Qualquer", a regra vale para todas as janelas correspondentes, e cada janela é acompanhada separadamente.
+With "Any", the rule applies to every matching window, and each window is tracked separately.
 
 ### Overlay
 
-Ligue em **Overlay → Mostrar overlay**, pelo tray ou pela linha de comando. Opções:
+Turn it on in **Overlay → Show overlay**, from the tray or from the command line. Options:
 
-| Opção | Efeito |
+| Option | Effect |
 |---|---|
-| Posição | Superior ou inferior, cada um à esquerda, no centro ou à direita, na área útil do monitor. Com âncora inferior, o overlay cresce para cima. |
-| Arrastar | Arraste o overlay para qualquer lugar: a posição é salva e restaurada ao reabrir. Escolher uma posição da lista volta para ela. |
-| Travar posição | Impede arrastar. Se algo mover a janela, ela volta ao lugar salvo quando reaparecer. |
-| Opacidade do fundo | De 0% (só o texto) a 100% |
-| Informações exibidas | Nome do provider, nome da janela (5h, 7d), percentual, tempo até o reset |
-| Janelas exibidas | Liga ou desliga cada janela (ex.: mostrar só a semanal) |
-| Usar XWayland | Só no Linux; ver [abaixo](#linux-gnome-wayland-e-tray) |
+| Position | Top or bottom, each left, center or right, inside the monitor's work area. With a bottom anchor, the overlay grows upwards. |
+| Dragging | Drag the overlay anywhere: the position is saved and restored on start. Choosing a position from the list snaps back to it. |
+| Lock position | Prevents dragging. If something moves the window, it returns to the saved place when it reappears. |
+| Background opacity | From 0% (text only) to 100% |
+| Information shown | Provider name, window name (5h, 7d), percentage, time until reset |
+| Windows shown | Turns each window on or off (e.g. show only the weekly one) |
+| Use XWayland | Linux only; see [below](#linux-gnome-wayland-and-the-tray) |
 
-Alertas de regras com canal overlay aparecem como um banner no topo do overlay. Clique para dispensar; se houver mais de um, aparece "+N alerta(s)". Se o overlay estiver desligado, ele aparece só enquanto houver alertas.
+Alerts from overlay-channel rules appear as a banner at the top of the overlay. Click to dismiss; when there are more, "+N more alert(s)" is shown. If the overlay is off, it appears only while there are alerts.
 
 ### Tray
 
-O menu tem: **Abrir janela**, **Overlay** (liga e desliga), **Atualizar agora** e **Sair**. No Linux, o tray não recebe cliques, então todas as ações ficam no menu.
+The menu has **Open window**, **Overlay** (on/off), **Refresh now** and **Quit**. On Linux the tray does not receive clicks, so every action is in the menu.
 
-### Linha de comando
+### Command line
 
-| Comando | Com o app fechado | Com o app rodando |
+| Command | App not running | App running |
 |---|---|---|
-| `ai_usage` | Abre a janela principal | Foca a janela principal |
-| `ai_usage --overlay` | Inicia só com tray e overlay | Liga o overlay |
-| `ai_usage --toggle` | Inicia só com tray e overlay ligado | Liga ou desliga o overlay |
-| `ai_usage --hidden` | Inicia só no tray | Nada |
+| `ai_usage` | Opens the main window | Focuses the main window |
+| `ai_usage --overlay` | Starts with only the tray and the overlay | Turns the overlay on |
+| `ai_usage --toggle` | Starts with only the tray and the overlay on | Turns the overlay on or off |
+| `ai_usage --hidden` | Starts with only the tray | Nothing |
 
-Com o app rodando, o comando não abre uma segunda cópia: ele repassa a flag para a instância existente e encerra (cerca de 0,1 s). Quando várias flags são passadas, vale a de efeito maior: `--toggle`, depois `--overlay`, depois `--hidden`.
+With the app running, the command does not start a second copy: it forwards the flag to the running instance and exits (about 0.1 s). When several flags are given, the one that does the most wins: `--toggle`, then `--overlay`, then `--hidden`.
 
-### Atalho de teclado para o overlay (GNOME)
+### Keyboard shortcut for the overlay (GNOME)
 
-1. Abra **Configurações → Teclado → Ver e personalizar atalhos → Atalhos personalizados → +**.
-2. Use como comando o caminho do binário com `--toggle`. Em desenvolvimento, por exemplo:
+1. Open **Settings → Keyboard → View and Customize Shortcuts → Custom Shortcuts → +**.
+2. Use `ai_usage --toggle` as the command (for a source build, the full path, e.g. `/path/to/ai_usage/src-tauri/target/release/ai_usage --toggle`).
+3. Choose the key combination (e.g. <kbd>Super</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd>).
 
-   ```
-   /caminho/para/ai_usage/src-tauri/target/debug/ai_usage --toggle
-   ```
+### Language
 
-3. Escolha a combinação de teclas (ex.: <kbd>Super</kbd>+<kbd>Shift</kbd>+<kbd>U</kbd>).
+The app follows the system language: Portuguese for any `pt` locale, English otherwise. To choose manually, use **Settings → Language** (Automatic, English or Português). The change applies at once to the UI, the tray, notifications and error messages, with no restart. Dates and times follow your system locale.
 
-## Linux: GNOME, Wayland e tray
+## Linux: GNOME, Wayland and the tray
 
-**Overlay no GNOME em Wayland.** O GNOME (Mutter) ignora "sempre no topo" e posicionamento para janelas comuns em Wayland. Nessa situação, o overlay aparece, mas sem ficar no topo e na posição que o compositor escolher. O app também não consegue saber onde a janela está, então arrastes nesse modo não são salvos. Há duas formas de resolver:
+**Overlay on GNOME with Wayland.** GNOME (Mutter) ignores "always on top" and positioning for regular windows on Wayland. In that case, the overlay shows up, but not on top and wherever the compositor places it. The app also cannot tell where the window is, so drags in that mode are not saved. There are two ways to fix this:
 
-- **Pelo app (recomendado):** marque **Overlay → Usar XWayland** e reinicie o app. Na inicialização, ele define `GDK_BACKEND=x11` e passa a rodar via XWayland, onde posição, trava e sempre no topo funcionam. A opção só tem efeito numa sessão Wayland e quando `GDK_BACKEND` não foi definido por você.
-- **Manualmente:**
+- **From the app (recommended):** check **Overlay → Use XWayland** and restart the app. On start, it sets `GDK_BACKEND=x11` and runs through XWayland, where position, lock and always-on-top work. The option only takes effect in a Wayland session and when you have not set `GDK_BACKEND` yourself.
+- **Manually:**
 
   ```sh
   GDK_BACKEND=x11 pnpm tauri dev
   ```
 
-Via XWayland, a janela principal também roda em X11 e pode ficar levemente borrada com escala fracionária. Aplicativos em tela cheia (vídeos, F11) ficam acima do overlay mesmo assim.
+Through XWayland, the main window also runs on X11 and may look slightly blurry with fractional scaling. Fullscreen applications (videos, F11) still stay above the overlay.
 
-**Notificações** são o canal principal no GNOME Wayland e funcionam sem configuração extra.
+**Notifications** are the main channel on GNOME Wayland and work with no extra setup.
 
-**Tray:** veja a instalação da extensão AppIndicator em [Requisitos](#dependências-de-sistema-linux). Sem ela, o tray não aparece.
+**Tray:** see the AppIndicator extension setup in [Requirements](#system-dependencies-linux). Without it, the tray does not show up.
 
-## Dados e privacidade
+## Data and privacy
 
-- **Rede:** a única conexão externa é com `api.anthropic.com`, usando o seu próprio token.
-- **Credenciais:** só leitura, a cada consulta. Nada é copiado nem salvo pelo app.
-- **Configurações:** ficam em um arquivo local, no diretório de dados do app:
+- **Network:** the only external connection is to `api.anthropic.com`, with your own token.
+- **Credentials:** read only, on each check. The app never copies or stores them.
+- **Settings:** stored in a local file in the app data directory:
 
   ```
   ~/.local/share/dev.jr.aiusage/ai-usage.json
   ```
 
-  | Chave | Conteúdo |
+  | Key | Contents |
   |---|---|
-  | `settings` | Intervalo de consulta, estado e preferências do overlay, posição salva, opção de XWayland |
-  | `rules` | Lista de regras |
-  | `ruleState` | Para cada regra e janela, o ciclo de reset em que ela já disparou |
+  | `settings` | Check interval, overlay state and preferences, saved position, XWayland option, language |
+  | `rules` | Rule list |
+  | `ruleState` | For each rule and window, the reset cycle in which it already fired |
 
-  Se o arquivo estiver danificado, o app inicia com os padrões em vez de travar. Uma regra ilegível é ignorada sem descartar as outras.
+  If the file is damaged, the app starts with defaults instead of crashing. An unreadable rule is skipped without discarding the others.
 
-## Arquitetura
+## Architecture
 
-O núcleo em Rust é a fonte única da verdade: consulta, regras, persistência, notificações, overlay e tray. A interface apenas chama comandos e escuta eventos.
+The Rust core is the single source of truth: checks, rules, persistence, notifications, overlay and tray. The UI only calls commands and listens to events.
 
 ```
 ai_usage/
-├─ index.html, overlay.html     # uma entrada do Vite por janela
-├─ src/                         # interface (Vue 3 + TypeScript)
-│  ├─ main/App.vue              # janela principal
+├─ index.html, overlay.html     # one Vite entry per window
+├─ src/                         # UI (Vue 3 + TypeScript)
+│  ├─ main/App.vue              # main window
 │  ├─ overlay/OverlayApp.vue    # overlay
 │  ├─ components/               # ProviderCard, UsageBar, RuleList, RuleForm,
 │  │                            # SettingsPanel, OverlaySettings
 │  ├─ composables/              # useUsage, useRules, useSettings, useOverlayAlerts, ...
-│  └─ lib/                      # types.ts (espelha o serde do Rust), api.ts, events.ts, format.ts
+│  ├─ i18n/                     # en.ts (reference), pt.ts, t()
+│  └─ lib/                      # types.ts (mirrors the Rust serde output), api.ts, events.ts, format.ts
 └─ src-tauri/
-   ├─ icons/app-icon.svg        # fonte de todos os ícones
+   ├─ icons/app-icon.svg        # source of every icon
    └─ src/
-      ├─ lib.rs                 # inicialização, plugins, comandos
+      ├─ lib.rs                 # startup, plugins, commands
       ├─ domain.rs, error.rs    # UsageWindow, ProviderStatus, ProviderError
-      ├─ providers/             # trait UsageProvider + ClaudeOAuthProvider
-      ├─ poller.rs              # consulta periódica e "atualizar agora"
-      ├─ rules/                 # modelo e motor de regras (função pura + testes)
-      ├─ store.rs, settings.rs  # persistência e configurações
-      ├─ alerts.rs              # despacho para notificação e overlay
-      ├─ overlay.rs             # janela, fila de alertas, posicionamento
-      ├─ tray.rs, windows.rs    # tray e comportamento das janelas
-      └─ cli.rs                 # flags de linha de comando
+      ├─ providers/             # UsageProvider trait + ClaudeOAuthProvider
+      ├─ poller.rs              # periodic check and "refresh now"
+      ├─ rules/                 # rule model and engine (pure function + tests)
+      ├─ store.rs, settings.rs  # persistence and settings
+      ├─ alerts.rs              # dispatch to notification and overlay
+      ├─ overlay.rs             # window, alert queue, placement
+      ├─ tray.rs, windows.rs    # tray and window behavior
+      ├─ i18n.rs                # language detection and core texts
+      └─ cli.rs                 # command-line flags
 ```
 
-### Modelo de dados
+### Data model
 
 ```rust
 UsageWindow { provider, kind: rolling_5h | rolling_7d, utilization /* 0–100 */, resets_at }
@@ -302,68 +323,73 @@ trait UsageProvider {
 }
 ```
 
-Novos providers (como o Gemini) só precisam implementar `UsageProvider`.
+New providers (such as Gemini) only need to implement `UsageProvider`.
 
-### Comandos e eventos
+### Commands and events
 
-| Comando | Descrição |
+| Command | Description |
 |---|---|
-| `get_snapshot`, `refresh_now` | Estado atual do uso; forçar consulta |
-| `get_settings`, `update_settings` | Configurações; altera só o intervalo de consulta |
-| `list_rules`, `create_rule`, `update_rule`, `delete_rule` | CRUD de regras |
+| `get_snapshot`, `refresh_now` | Current usage; force a check |
+| `get_settings`, `update_settings` | Settings; changes only the check interval |
+| `list_rules`, `create_rule`, `update_rule`, `delete_rule` | Rule CRUD |
 | `set_overlay_visible`, `update_overlay_prefs`, `set_overlay_anchor` | Overlay |
-| `get_overlay_alerts`, `dismiss_overlay_alert` | Fila de alertas do overlay |
-| `set_use_xwayland` | Opção de XWayland (vale após reiniciar) |
+| `get_overlay_alerts`, `dismiss_overlay_alert` | Overlay alert queue |
+| `set_use_xwayland` | XWayland option (applies after a restart) |
+| `get_language`, `set_language` | Current language and locale; manual choice |
 
-| Evento | Payload |
+| Event | Payload |
 |---|---|
-| `usage://updated` | `UsageSnapshot`, após cada consulta |
-| `settings://changed` | `Settings`, após qualquer mudança (inclusive pelo tray) |
-| `overlay://alerts` | Fila de alertas do overlay |
+| `usage://updated` | `UsageSnapshot`, after each check |
+| `settings://changed` | `Settings`, after any change (including from the tray) |
+| `overlay://alerts` | Overlay alert queue |
+| `language://changed` | Language and locale, after a language change |
 
-## Desenvolvimento
+## Development
 
 ```sh
-# Testes do núcleo (motor de regras, parser do Claude, configurações, overlay, CLI)
+# Core tests (rule engine, Claude parser, settings, overlay, CLI, i18n)
 cd src-tauri && cargo test
 
-# Lint e formatação do Rust
+# Rust lint and formatting
 cargo clippy --all-targets
 cargo fmt --check
 
-# Checagem de tipos e build do front
+# Type checking and frontend build
 cd .. && pnpm build
 ```
 
-O motor de regras é uma função pura (`rules::engine::evaluate`): recebe as regras, as janelas, o estado e o horário atual, e devolve os alertas. Isso permite testar cruzamento de limiar, reset de ciclo, variação do horário de reset e reinício sem depender de tempo real.
+The rule engine is a pure function (`rules::engine::evaluate`): it takes the rules, the windows, the state, the current time and the language, and returns the alerts. This makes threshold crossing, cycle reset, reset-time jitter and restarts testable without real time.
 
-**Ícones:** edite `src-tauri/icons/app-icon.svg` e regenere todos os tamanhos com:
+**Translations:** the UI texts live in `src/i18n/en.ts` (the reference) and `src/i18n/pt.ts`. TypeScript rejects a language file that is missing a key. The core texts (notifications, errors, tray) live in `src-tauri/src/i18n.rs`, where exhaustive `match` blocks reject a missing translation at compile time.
+
+**Icons:** edit `src-tauri/icons/app-icon.svg` and regenerate every size with:
 
 ```sh
 pnpm tauri icon src-tauri/icons/app-icon.svg
 ```
 
-**Commits** seguem [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `refactor`, `docs`...), em inglês, um assunto por commit, com corpo explicando o que mudou e por quê.
+**Commits** follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat`, `fix`, `refactor`, `docs`...), in English, one subject per commit, with a body explaining what changed and why.
 
-## Solução de problemas
+## Troubleshooting
 
-| Sintoma | Causa provável e solução |
+| Symptom | Likely cause and fix |
 |---|---|
-| "Credenciais do Claude Code não encontradas" | O Claude Code não está instalado ou sem login. Rode `claude` e faça login. |
-| "Token do Claude expirado" ou "recusado (HTTP 401)" | Só o Claude Code renova o token, o que acontece quando ele é usado. Abra e use o Claude Code, depois clique em **Atualizar**. |
-| "Limite de consultas … (HTTP 429)" | Muitas consultas seguidas. O app tenta de novo na próxima consulta; aumente o intervalo se acontecer com frequência. |
-| O ícone do tray não aparece | Falta a extensão AppIndicator do GNOME; ver [Requisitos](#dependências-de-sistema-linux). |
-| O overlay não fica por cima ou não respeita a posição | Sessão Wayland. Ative **Usar XWayland** e **reinicie o app**. |
-| O overlay abre colado no canto superior esquerdo | Posição salva inválida. Escolha uma posição na lista **Posição**. |
-| Notificações aparecem com o nome "ai_usage" | Em desenvolvimento, o GNOME usa o nome do executável. Em um build instalado, usa o nome do atalho do app. |
+| "Claude Code credentials not found" | Claude Code is not installed or not logged in. Run `claude` and log in. |
+| "Claude token expired" or "refused (HTTP 401)" | Only Claude Code renews the token, which happens when it is used. Open and use Claude Code, then click **Refresh**. |
+| "Usage endpoint rate limit reached (HTTP 429)" | Too many checks in a row. The app retries on the next check; increase the interval if it happens often. |
+| The tray icon does not show up | The GNOME AppIndicator extension is missing; see [Requirements](#system-dependencies-linux). |
+| The overlay does not stay on top or ignores its position | Wayland session. Enable **Use XWayland** and **restart the app**. |
+| The overlay opens stuck to the top-left corner | Invalid saved position. Choose a position in the **Position** list. |
+| Notifications show the name "ai_usage" | In development, GNOME uses the executable name. An installed build uses the app's desktop entry name. |
 
 ## Roadmap
 
-- [x] Provider do Claude, tela de status e consulta periódica
-- [x] Motor de regras, notificações e persistência
-- [x] Overlay com posição, trava, opacidade e escolha do que exibir
-- [x] Linha de comando (`--toggle`, `--overlay`) e opção de XWayland
-- [ ] Provider do Gemini/Antigravity
-- [ ] Inicialização automática com o sistema
+- [x] Claude provider, status screen and periodic check
+- [x] Rule engine, notifications and persistence
+- [x] Overlay with position, lock, opacity and display options
+- [x] Command line (`--toggle`, `--overlay`) and XWayland option
+- [x] English and Portuguese
+- [ ] Gemini/Antigravity provider
+- [ ] Launch at login
 - [ ] Windows
 - [ ] Android
